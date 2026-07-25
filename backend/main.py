@@ -1,28 +1,52 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import sessions, messages
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
-app = FastAPI(title="LUNA API", version="0.1.0")
+from .routes import sessions, messages, users, health
+from .database.init_db import init_database
 
-# CORS for local development
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize database on startup."""
+    await init_database()
+    yield
+
+
+app = FastAPI(
+    title="LUNA API",
+    version="0.1.0",
+    description="Backend API for LUNA mental health support app",
+    lifespan=lifespan
+)
+
+# CORS — allow frontend dev server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Mount static files for voice note playback
+storage_path = Path(__file__).parent / "storage"
+storage_path.mkdir(parents=True, exist_ok=True)
+app.mount("/storage", StaticFiles(directory=str(storage_path)), name="storage")
+
 # Include routers
-app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
-app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
+app.include_router(health.router)
+app.include_router(users.router)
+app.include_router(sessions.router)
+app.include_router(messages.router)
 
 
 @app.get("/")
 async def root():
-    return {"message": "LUNA API is running", "status": "healthy"}
-
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+    return {
+        "message": "LUNA API",
+        "version": "0.1.0",
+        "status": "running"
+    }

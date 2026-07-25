@@ -1,31 +1,113 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Query
+import aiosqlite
+from typing import List
+from ..database.connection import get_db
+from ..models.session import Session, SessionCreate, SessionUpdate, SessionWithPreview
+from ..services import session_service
 
-router = APIRouter()
-
-
-@router.get("/")
-async def get_sessions():
-    """Get all sessions, grouped by date"""
-    # TODO: Connect to database
-    return {"sessions": []}
+router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 
-@router.post("/")
-async def create_session():
-    """Create a new session"""
-    # TODO: Connect to database
-    return {"id": "new-session-id", "created_at": "2024-01-01T00:00:00Z"}
+def session_to_preview(session: Session, message_count: int = 0, preview: str = "") -> SessionWithPreview:
+    """Convert a Session to SessionWithPreview with computed fields."""
+    from datetime import datetime
+
+    # Compute relative time string
+    time_str = ""
+    if session.last_message_at:
+        diff = datetime.utcnow() - session.last_message_at
+        if diff.days == 0:
+            hours = diff.seconds // 3600
+            if hours == 0:
+                minutes = diff.seconds // 60
+                time_str = f"{minutes} min ago" if minutes > 0 else "Just now"
+            else:
+                time_str = f"{hours}h ago"
+        elif diff.days == 1:
+            time_str = "Yesterday"
+        elif diff.days < 7:
+            time_str = f"{diff.days} days ago"
+        else:
+            time_str = session.last_message_at.strftime("%b %d")
+    elif session.created_at:
+        diff = datetime.utcnow() - session.created_at
+        if diff.days == 0:
+            time_str = "Today"
+        elif diff.days == 1:
+            time_str = "Yesterday"
+        else:
+            time_str = session.created_at.strftime("%b %d")
+
+    return SessionWithPreview(
+        **session.model_dump(),
+        message_count=message_count,
+        preview=preview,
+        time=time_str
+    )
 
 
-@router.get("/{session_id}")
-async def get_session(session_id: str):
-    """Get a specific session"""
-    # TODO: Connect to database
-    return {"id": session_id, "created_at": "2024-01-01T00:00:00Z"}
+@router.post("/", response_model=Session)
+async def create_session(
+    session_data: SessionCreate,
+    db: aiosqlite.Connection = Depends(get_db)
+):
+    """Create a new session."""
+    return await session_service.create_session(db, session_data)
+
+
+@router.get("/", response_model=List[SessionWithPreview])
+async def list_sessions(
+    user_id: str = Query(..., description="User ID to filter sessions"),
+    include_archived: bool = Query(False, description="Include archived sessions"),
+    db: aiosqlite.Connection = Depends(get_db)
+):
+    """List all sessions for a user, with previews."""
+    sessions = await session_service.get_sessions_by_user(db, user_id, include_archived)
+
+    result = []
+    for session in sessions:
+        # Get message count and first message preview
+        from ..services import message_service
+        messages = await message_service.get_messages_by_session(db, session.id, limit=1)
+        preview = messages[0].content[:50] if messages else ""
+
+        result.append(session_to_preview(session, len(messages), preview))
+
+    return result
+
+
+@router.get("/{session_id}", response_model=Session)
+async def get_session(
+    session_id: str,
+    db: aiosqlite.Connection = Depends(get_db)
+):
+    """Get a session by ID."""
+    session = await session_service.get_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
+@router.patch("/{session_id}", response_model=Session)
+async def update_session(
+    session_id: str,
+    updates: SessionUpdate,
+    db: aiosqlite.Connection = Depends(get_db)
+):
+    """Update session fields."""
+    session = await session_service.update_session(db, session_id, updates)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @router.delete("/{session_id}")
-async def delete_session(session_id: str):
-    """Delete a session"""
-    # TODO: Connect to database
-    return {"success": True}
+async def delete_session(
+    session_id: str,
+    db: aiosqlite.Connection = Depends(get_db)
+):
+    """Soft delete a session."""
+    success = await session_service.soft_delete_session(db, session_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"success": True, "message": "Session deleted"}
