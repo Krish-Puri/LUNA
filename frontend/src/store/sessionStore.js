@@ -45,11 +45,14 @@ const useSessionStore = create((set, get) => ({
       // Attach computed group/time fields from backend
       const mapped = sessions.map(s => ({
         id: s.id,
+        title: s.title_custom || s.title_auto || '',
         preview: s.preview || '',
         time: s.time || computeTime(s.last_message_at, s.created_at),
         group: computeGroup(s.last_message_at, s.created_at),
         createdAt: new Date(s.created_at),
         lastMessageAt: s.last_message_at ? new Date(s.last_message_at) : null,
+        isPinned: s.is_pinned || false,
+        isArchived: s.is_archived || false,
         messages: [],
       }))
       set({ sessions: mapped, isLoading: false })
@@ -75,11 +78,14 @@ const useSessionStore = create((set, get) => ({
       const session = await sessionsApi.createSession(userId)
       const newSession = {
         id: session.id,
+        title: '',
         preview: '',
         time: 'Just now',
         group: 'today',
         createdAt: new Date(session.created_at),
         lastMessageAt: null,
+        isPinned: false,
+        isArchived: false,
         messages: [],
       }
       set(state => ({
@@ -104,6 +110,63 @@ const useSessionStore = create((set, get) => ({
     } catch (err) {
       set({ error: err.message })
     }
+  },
+
+  // Clear active session (e.g. after deleting the active one)
+  clearActiveSession: () => set({ activeSessionId: null }),
+
+  // Rename session
+  renameSession: async (sessionId, title) => {
+    // Optimistic update
+    set(state => ({
+      sessions: state.sessions.map(s =>
+        s.id === sessionId
+          ? { ...s, title, preview: title }
+          : s
+      ),
+    }))
+    try {
+      await sessionsApi.updateSession(sessionId, { title_custom: title })
+    } catch (err) {
+      set({ error: err.message })
+    }
+  },
+
+  // Archive session
+  archiveSession: async (sessionId) => {
+    set(state => ({
+      sessions: state.sessions.map(s =>
+        s.id === sessionId ? { ...s, isArchived: true } : s
+      ),
+    }))
+    try {
+      await sessionsApi.updateSession(sessionId, { is_archived: true })
+    } catch (err) {
+      set({ error: err.message })
+    }
+  },
+
+  // Unarchive session
+  unarchiveSession: async (sessionId) => {
+    set(state => ({
+      sessions: state.sessions.map(s =>
+        s.id === sessionId ? { ...s, isArchived: false } : s
+      ),
+    }))
+    try {
+      await sessionsApi.updateSession(sessionId, { is_archived: false })
+    } catch (err) {
+      set({ error: err.message })
+    }
+  },
+
+  // Toggle pin (local only — no backend field)
+  togglePin: (sessionId) => {
+    set(state => ({
+      sessions: state.sessions.map(s =>
+        s.id === sessionId ? { ...s, isPinned: !s.isPinned } : s
+      ),
+    }))
   },
 
   // Update session preview after a new message

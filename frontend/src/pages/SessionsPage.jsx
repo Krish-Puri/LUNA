@@ -56,10 +56,16 @@ const SessionsPage = () => {
     activeSessionId,
     userId,
     setActiveSession,
+    clearActiveSession,
     createSession,
     addMessage,
     updateSessionPreview,
     initialize,
+    renameSession,
+    deleteSession,
+    archiveSession,
+    unarchiveSession,
+    togglePin,
   } = useSessionStore()
 
   const {
@@ -116,11 +122,20 @@ const SessionsPage = () => {
     if (!isInitialized) return
     const currentId = activeSessionId || sessionId
     if (currentId) {
+      // Guard: if activeSessionId is null but sessionId is set, the session may have been
+      // deleted — check it still exists in the sessions list before loading
+      if (activeSessionId === null && sessionId) {
+        const stillExists = sessions.some(s => s.id === sessionId)
+        if (!stillExists) {
+          clearMessages()
+          return
+        }
+      }
       loadMessages(currentId)
     } else {
       clearMessages()
     }
-  }, [activeSessionId, sessionId, isInitialized, loadMessages, clearMessages])
+  }, [activeSessionId, sessionId, isInitialized, loadMessages, clearMessages, sessions])
 
   // Handle new session creation
   const handleNewSession = async () => {
@@ -206,6 +221,34 @@ const SessionsPage = () => {
     clearRecording()
   }
 
+  // Session management handlers
+  const handleRename = async (sessionId) => {
+    const session = sessions.find(s => s.id === sessionId)
+    const current = session?.title || session?.preview || ''
+    const newTitle = window.prompt('Rename conversation:', current)
+    if (newTitle !== null && newTitle !== current) {
+      await renameSession(sessionId, newTitle)
+    }
+  }
+
+  const handleDelete = async (sessionId) => {
+    if (!window.confirm('Delete this conversation? This cannot be undone.')) return
+    const wasActive = activeSessionId === sessionId || sessionId === sessionId
+    await deleteSession(sessionId)
+    if (wasActive) {
+      clearActiveSession()
+      clearMessages()
+      navigate('/')
+    }
+  }
+
+  const handleRenameFromHeader = async (newTitle) => {
+    const currentId = activeSessionId || sessionId
+    if (currentId) {
+      await renameSession(currentId, newTitle)
+    }
+  }
+
   // Handle starting voice recording
   const handleStartRecording = async () => {
     try {
@@ -252,14 +295,20 @@ const SessionsPage = () => {
         activeSessionId={activeSessionId || sessionId}
         onSessionSelect={setActiveSession}
         onNewSession={handleNewSession}
+        onRename={handleRename}
+        onDelete={handleDelete}
+        onArchive={archiveSession}
+        onUnarchive={unarchiveSession}
+        onTogglePin={togglePin}
       />
 
       {/* Main Content Area */}
       <MainContent>
         {/* Header */}
         <Header
-          title={activeSession?.preview?.slice(0, 30) || 'LUNA'}
+          title={activeSession?.title || activeSession?.preview?.slice(0, 30) || 'LUNA'}
           subtitle={activeSession?.time || ''}
+          onRename={handleRenameFromHeader}
         />
 
         {/* Chat Area */}

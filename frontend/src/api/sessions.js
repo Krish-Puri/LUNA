@@ -16,3 +16,10 @@ export async function deleteSession(sessionId) {
     method: 'DELETE',
   })
 }
+
+export async function updateSession(sessionId, data = {}) {
+  return request(`/api/sessions/${sessionId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
