@@ -14,7 +14,7 @@ const useVoiceStore = create((set, get) => ({
       audioBlob: null,
       audioUrl: null,
       duration: 0,
-      error: null
+      error: null,
     })
   },
 
@@ -25,7 +25,7 @@ const useVoiceStore = create((set, get) => ({
       recordingState: 'recorded',
       audioBlob,
       audioUrl,
-      error: null
+      error: null,
     })
     return audioUrl
   },
@@ -38,7 +38,7 @@ const useVoiceStore = create((set, get) => ({
       recordingState: 'idle',
       audioBlob: null,
       audioUrl: null,
-      duration: 0
+      duration: 0,
     })
   },
 
@@ -51,7 +51,7 @@ const useVoiceStore = create((set, get) => ({
   setError: (error) => set({ error, recordingState: 'idle' }),
 
   // Update duration
-  setDuration: (duration) => set({ duration })
+  setDuration: (duration) => set({ duration }),
 }))
 
 export default useVoiceStore

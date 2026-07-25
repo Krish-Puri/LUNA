@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble'
+import Avatar from '../ui/Avatar'
 
 const ChatArea = ({ messages = [], isTyping = false }) => {
   const messagesEndRef = useRef(null)

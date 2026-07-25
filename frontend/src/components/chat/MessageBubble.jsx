@@ -2,7 +2,7 @@ import Avatar from '../ui/Avatar'
 
 const MessageBubble = ({ message, showAvatar = true }) => {
   const isUser = message.role === 'user'
-  const isLuna = message.role === 'luna'
+  const isLuna = message.role === 'luna' || message.role === 'assistant'
 
   return (
     <div className={`flex gap-3 px-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>

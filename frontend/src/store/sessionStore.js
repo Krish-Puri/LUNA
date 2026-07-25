@@ -1,87 +1,62 @@
 import { create } from 'zustand'
+import * as sessionsApi from '../api/sessions'
 
-// Generate mock sessions for demo
-const generateMockSessions = () => {
+function computeGroup(lastMessageAt, createdAt) {
   const now = new Date()
+  const ref = lastMessageAt ? new Date(lastMessageAt) : new Date(createdAt)
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterday = new Date(today - 86400000)
-  const twoDaysAgo = new Date(today - 2 * 86400000)
-  const lastWeek = new Date(today - 7 * 86400000)
+  const refDay = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate())
+  const diffDays = Math.floor((today - refDay) / 86400000)
 
-  return [
-    {
-      id: 'session-1',
-      preview: 'I had a difficult conversation with my boss today...',
-      time: '2 hours ago',
-      group: 'today',
-      createdAt: new Date(today.getTime() - 2 * 3600000),
-      messages: [
-        {
-          id: 'msg-1',
-          role: 'user',
-          content: 'I had a difficult conversation with my boss today and I feel really drained.',
-          timestamp: '2:34 PM'
-        },
-        {
-          id: 'msg-2',
-          role: 'luna',
-          content: 'That sounds like a really challenging day. It takes courage to navigate difficult conversations at work. How are you feeling right now, in this moment?',
-          timestamp: '2:35 PM'
-        }
-      ]
-    },
-    {
-      id: 'session-2',
-      preview: 'I have been feeling anxious about an upcoming trip',
-      time: 'Yesterday',
-      group: 'yesterday',
-      createdAt: new Date(yesterday.getTime()),
-      messages: [
-        {
-          id: 'msg-3',
-          role: 'user',
-          content: 'I have been feeling anxious about an upcoming trip for weeks now.',
-          timestamp: '10:15 AM'
-        },
-        {
-          id: 'msg-4',
-          role: 'luna',
-          content: 'Anxiety about something in the future is completely natural. It shows you care. What is it specifically about the trip that is causing you worry?',
-          timestamp: '10:16 AM'
-        }
-      ]
-    },
-    {
-      id: 'session-3',
-      preview: 'I want to talk about my meditation practice',
-      time: 'Yesterday',
-      group: 'yesterday',
-      createdAt: new Date(yesterday.getTime() - 3600000 * 6),
-      messages: []
-    },
-    {
-      id: 'session-4',
-      preview: 'Feeling grateful today but also a bit overwhelmed',
-      time: '2 days ago',
-      group: 'earlier',
-      createdAt: new Date(twoDaysAgo.getTime()),
-      messages: []
-    },
-    {
-      id: 'session-5',
-      preview: 'Work-life balance has been on my mind',
-      time: 'Last week',
-      group: 'earlier',
-      createdAt: new Date(lastWeek.getTime()),
-      messages: []
-    }
-  ]
+  if (diffDays === 0) return 'today'
+  if (diffDays === 1) return 'yesterday'
+  return 'earlier'
+}
+
+function computeTime(lastMessageAt, createdAt) {
+  const now = new Date()
+  const ref = lastMessageAt ? new Date(lastMessageAt) : new Date(createdAt)
+  const diff = now - ref
+  const diffDays = Math.floor(diff / 86400000)
+  const diffHours = Math.floor(diff / 3600000)
+  const diffMinutes = Math.floor(diff / 60000)
+
+  if (diffDays === 0) {
+    if (diffHours === 0) return diffMinutes <= 1 ? 'Just now' : `${diffMinutes} min ago`
+    return `${diffHours}h ago`
+  }
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  return ref.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 const useSessionStore = create((set, get) => ({
-  sessions: generateMockSessions(),
+  sessions: [],
   activeSessionId: null,
   isLoading: false,
+  error: null,
+  userId: null,
+
+  // Initialize: load sessions from API
+  initialize: async (userId) => {
+    set({ isLoading: true, error: null, userId })
+    try {
+      const sessions = await sessionsApi.getSessions(userId)
+      // Attach computed group/time fields from backend
+      const mapped = sessions.map(s => ({
+        id: s.id,
+        preview: s.preview || '',
+        time: s.time || computeTime(s.last_message_at, s.created_at),
+        group: computeGroup(s.last_message_at, s.created_at),
+        createdAt: new Date(s.created_at),
+        lastMessageAt: s.last_message_at ? new Date(s.last_message_at) : null,
+        messages: [],
+      }))
+      set({ sessions: mapped, isLoading: false })
+    } catch (err) {
+      set({ error: err.message, isLoading: false })
+    }
+  },
 
   // Get active session
   getActiveSession: () => {
@@ -93,58 +68,87 @@ const useSessionStore = create((set, get) => ({
   setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
 
   // Create new session
-  createSession: (sessionId) => {
-    const newSession = {
-      id: sessionId,
-      preview: '',
-      time: 'Just now',
-      group: 'today',
-      createdAt: new Date(),
-      messages: []
+  createSession: async () => {
+    const { userId } = get()
+    if (!userId) return null
+    try {
+      const session = await sessionsApi.createSession(userId)
+      const newSession = {
+        id: session.id,
+        preview: '',
+        time: 'Just now',
+        group: 'today',
+        createdAt: new Date(session.created_at),
+        lastMessageAt: null,
+        messages: [],
+      }
+      set(state => ({
+        sessions: [newSession, ...state.sessions],
+        activeSessionId: session.id,
+      }))
+      return newSession
+    } catch (err) {
+      set({ error: err.message })
+      return null
     }
-    set(state => ({
-      sessions: [newSession, ...state.sessions],
-      activeSessionId: sessionId
-    }))
-    return newSession
   },
 
   // Delete session
-  deleteSession: (sessionId) => {
+  deleteSession: async (sessionId) => {
+    try {
+      await sessionsApi.deleteSession(sessionId)
+      set(state => ({
+        sessions: state.sessions.filter(s => s.id !== sessionId),
+        activeSessionId: state.activeSessionId === sessionId ? null : state.activeSessionId,
+      }))
+    } catch (err) {
+      set({ error: err.message })
+    }
+  },
+
+  // Update session preview after a new message
+  updateSessionPreview: (sessionId, preview) => {
     set(state => ({
-      sessions: state.sessions.filter(s => s.id !== sessionId),
-      activeSessionId: state.activeSessionId === sessionId ? null : state.activeSessionId
+      sessions: state.sessions.map(session => {
+        if (session.id !== sessionId) return session
+        const updated = {
+          ...session,
+          preview,
+          time: 'Just now',
+          group: 'today',
+          lastMessageAt: new Date(),
+        }
+        return updated
+      }).sort((a, b) => {
+        const aTime = a.lastMessageAt || a.createdAt
+        const bTime = b.lastMessageAt || b.createdAt
+        return bTime - aTime
+      }),
     }))
   },
 
-  // Add message to session
+  // Append message to a session's message list
   addMessage: (sessionId, message) => {
     set(state => ({
       sessions: state.sessions.map(session => {
         if (session.id !== sessionId) return session
-        const newPreview = message.role === 'user'
-          ? (message.content || message.transcription || 'Voice note').slice(0, 50)
-          : session.preview
         return {
           ...session,
-          preview: newPreview || session.preview,
-          messages: [...session.messages, message]
+          messages: [...session.messages, message],
         }
-      })
+      }),
     }))
   },
 
-  // Update session with LUNA response
-  setLunaResponse: (sessionId, content) => {
-    const lunaMessage = {
-      id: `msg-${Date.now()}`,
-      role: 'luna',
-      content,
-      timestamp: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    }
-    get().addMessage(sessionId, lunaMessage)
-    return lunaMessage
-  }
+  // Load messages into a session
+  setSessionMessages: (sessionId, messages) => {
+    set(state => ({
+      sessions: state.sessions.map(session => {
+        if (session.id !== sessionId) return session
+        return { ...session, messages }
+      }),
+    }))
+  },
 }))
 
 export default useSessionStore
