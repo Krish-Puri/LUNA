@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* LUNA Global Styles */
+:root {
+  --color-bg-primary: #FDFBF9;
+  --color-bg-secondary: #F7F4F1;
+  --color-bg-tertiary: #EFEBE7;
+  --color-surface: #FFFFFF;
+  --color-border: #E8E3DE;
+  --color-border-strong: #D4CEC8;
+  --color-text-primary: #2D2A28;
+  --color-text-secondary: #6B6560;
+  --color-text-tertiary: #9C958F;
+  --color-text-inverse: #FDFBF9;
+  --color-accent: #B85C5C;
+  --color-accent-hover: #A14D4D;
+  --color-accent-light: #F5E8E8;
+  --color-user-bubble: #F7F4F1;
+  --color-luna-bubble: #FFFFFF;
+  --color-luna-border: #E8E3DE;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-accent-light);
+  color: var(--color-text-primary);
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Smooth transitions */
+button, a, input, textarea {
+  transition: all 150ms ease-out;
+}
+
+/* Disable tap highlight on mobile */
+button, input, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
