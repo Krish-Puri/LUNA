@@ -195,7 +195,7 @@ const SessionsPage = () => {
     } else {
       clearMessages()
     }
-  }, [activeSessionId, sessionId, isInitialized, loadMessages, clearMessages, sessions])
+  }, [activeSessionId, sessionId, isInitialized, loadMessages, clearMessages])
 
   // Handle new session creation
   const handleNewSession = async () => {
@@ -432,9 +432,9 @@ const SessionsPage = () => {
     // Use the edited transcript (from voiceStore), falling back to the raw transcript
     const transcriptToSend = editedTranscript || transcript || ''
 
-    const tempVoiceId = `voice-${Date.now()}`
     const voiceMsg = addVoiceMessage(audioUrl, transcriptToSend)
-    addMessage(currentSessionId, { ...voiceMsg, id: tempVoiceId })
+    // Note: addVoiceMessage already adds the optimistic message to chatStore.messages.
+    // Do NOT add it again here (addMessage would create a duplicate in sessionStore).
     updateSessionPreview(currentSessionId, transcriptToSend.slice(0, 50) || 'Voice note')
 
     // Keep blob reference before clearing
@@ -456,7 +456,7 @@ const SessionsPage = () => {
           minute: '2-digit',
         }),
       }
-      replaceMessage(tempVoiceId, confirmedVoiceMsg)
+      replaceMessage(voiceMsg.id, confirmedVoiceMsg)
 
       // Stream LUNA's response to the transcript
       if (transcriptToSend) {
