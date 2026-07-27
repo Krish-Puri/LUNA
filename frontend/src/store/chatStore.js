@@ -144,11 +144,18 @@ const useChatStore = create((set, get) => ({
     set(state => ({ messages: [...state.messages, message] }))
   },
 
-  // Replace an optimistic message with the server-confirmed version
+  // Replace an optimistic message with the server-confirmed version.
+  // Falls back to append if the placeholder wasn't found (handles duplicate /
+  // missed-replace cases gracefully — prevents orphaned optimistics from vanishing).
   replaceMessage: (tempId, confirmedMessage) => {
-    set(state => ({
-      messages: state.messages.map(m => m.id === tempId ? confirmedMessage : m),
-    }))
+    set(state => {
+      const exists = state.messages.some(m => m.id === tempId)
+      return {
+        messages: exists
+          ? state.messages.map(m => m.id === tempId ? confirmedMessage : m)
+          : [...state.messages, confirmedMessage],
+      }
+    })
   },
 
   // Edit a user message content and mark it as edited
