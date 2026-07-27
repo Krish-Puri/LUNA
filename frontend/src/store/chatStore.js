@@ -49,6 +49,12 @@ const useChatStore = create((set, get) => ({
 
   // Load messages for a session from API
   loadMessages: async (sessionId) => {
+    // Preserve any optimistic (temp-ID) messages that haven't been confirmed yet.
+    // This prevents in-flight voice notes / unconfirmed messages from being wiped
+    // out when the loadMessages effect fires during an active upload.
+    const optimisticMessages = get().messages.filter(m =>
+      m.id && (m.id.startsWith('voice-') || m.id.startsWith('user-') || m.id.startsWith('luna-'))
+    )
     set({ isSending: true, error: null })
     try {
       const msgs = await messagesApi.getMessages(sessionId)
@@ -71,7 +77,7 @@ const useChatStore = create((set, get) => ({
           }),
         }
       })
-      set({ messages: mapped, isSending: false })
+      set({ messages: [...mapped, ...optimisticMessages], isSending: false })
     } catch (err) {
       set({ error: err.message, isSending: false })
     }
