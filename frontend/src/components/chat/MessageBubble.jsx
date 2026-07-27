@@ -1,8 +1,84 @@
+import { useRef, useState } from 'react'
 import Avatar from '../ui/Avatar'
+
+const formatTime = (seconds) => {
+  if (!seconds || isNaN(seconds)) return '0:00'
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+const VoicePlayer = ({ audioUrl }) => {
+  const audioRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+
+  const toggle = () => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playing) {
+      audio.pause()
+    } else {
+      audio.play()
+    }
+    setPlaying(!playing)
+  }
+
+  const onTimeUpdate = () => {
+    const audio = audioRef.current
+    if (audio) setCurrentTime(audio.currentTime)
+  }
+
+  const onLoadedMetadata = () => {
+    const audio = audioRef.current
+    if (audio) setDuration(audio.duration)
+  }
+
+  const onEnded = () => setPlaying(false)
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
+
+  return (
+    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        onTimeUpdate={onTimeUpdate}
+        onLoadedMetadata={onLoadedMetadata}
+        onEnded={onEnded}
+      />
+      <button
+        onClick={toggle}
+        className="w-8 h-8 rounded-full bg-accent text-text-inverse flex items-center justify-center hover:bg-accent-hover transition-colors flex-shrink-0"
+      >
+        {playing ? (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        )}
+      </button>
+      <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
+        <div
+          className="h-full bg-accent rounded-full transition-all duration-100"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <span className="text-xs text-text-tertiary tabular-nums w-8 text-right">
+        {playing ? formatTime(currentTime) : formatTime(duration)}
+      </span>
+    </div>
+  )
+}
 
 const MessageBubble = ({ message, showAvatar = true, onEdit }) => {
   const isUser = message.role === 'user'
   const isLuna = message.role === 'luna' || message.role === 'assistant'
+  const isVoice = message.messageType === 'voice'
 
   return (
     <div className={`flex gap-3 px-4 group ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -28,8 +104,13 @@ const MessageBubble = ({ message, showAvatar = true, onEdit }) => {
             }
           `}
         >
-          {/* Text content */}
-          {message.content && (
+          {/* Voice note player */}
+          {isVoice && message.audioUrl && (
+            <VoicePlayer audioUrl={message.audioUrl} />
+          )}
+
+          {/* Text content — hidden for voice messages (transcript shown below) */}
+          {message.content && !isVoice && (
             <p className="text-sm text-text-primary whitespace-pre-wrap">
               {message.content}
               {/* Blinking cursor while LUNA is streaming a response */}
@@ -37,21 +118,6 @@ const MessageBubble = ({ message, showAvatar = true, onEdit }) => {
                 <span className="inline-block w-2 h-4 bg-accent ml-0.5 animate-pulse align-middle" />
               )}
             </p>
-          )}
-
-          {/* Voice note indicator */}
-          {message.audioUrl && (
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
-              <button className="w-8 h-8 rounded-full bg-accent text-text-inverse flex items-center justify-center hover:bg-accent-hover transition-colors">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </button>
-              <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
-                <div className="h-full w-0 bg-accent rounded-full" />
-              </div>
-              <span className="text-xs text-text-tertiary">0:00</span>
-            </div>
           )}
 
           {/* Transcription */}

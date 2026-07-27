@@ -69,7 +69,15 @@ async def list_sessions(
         # Get message count and first message preview
         from ..services import message_service
         messages = await message_service.get_messages_by_session(db, session.id, limit=1)
-        preview = messages[0].content[:50] if messages else ""
+        first_msg = messages[0] if messages else None
+        preview_text = ""
+        if first_msg:
+            # Voice messages: use transcript from voice_note; text messages: use content
+            if first_msg.message_type == "voice" and first_msg.voice_note:
+                preview_text = first_msg.voice_note.transcript or ""
+            else:
+                preview_text = first_msg.content or ""
+        preview = preview_text[:50] if preview_text else ""
 
         result.append(session_to_preview(session, len(messages), preview))
 

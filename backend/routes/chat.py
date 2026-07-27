@@ -85,6 +85,18 @@ async def event_generator(
     # Build full messages list for Groq
     luna_messages = await luna_service.build_luna_messages(history, user_content)
 
+    # Pre-create the assistant message with a known UUID so the frontend can
+    # replace its streaming placeholder by ID when the done event arrives
+    assistant_msg_id = str(uuid.uuid4())
+    assistant_data = MessageCreate(
+        id=assistant_msg_id,
+        session_id=session_id,
+        role="assistant",
+        content="",
+        message_type="text",
+    )
+    await message_service.create_message(db, assistant_data)
+
     try:
         # Stream from Groq — run blocking SDK in thread pool
         async for token in groq_stream_async(luna_messages, model):
@@ -103,42 +115,27 @@ async def event_generator(
         token_count = len(full_response)
         full_text = "".join(full_response)
 
-        # Persist assistant message to DB — always use a new UUID (not the user's message_id)
-        assistant_data = MessageCreate(
-            session_id=session_id,
-            role="assistant",
+        # Update assistant message with final content and metadata
+        updates = MessageUpdate(
             content=full_text,
-            message_type="text",
+            token_count=token_count,
+            latency_ms=total_latency_ms,
         )
-        await message_service.create_message(db, assistant_data)
-
-        # Patch with token/latency metadata
-        cursor = await db.execute(
-            "SELECT id FROM messages WHERE session_id = ? AND role = 'assistant' AND content = ? ORDER BY created_at DESC LIMIT 1",
-            (session_id, full_text)
-        )
-        created = await cursor.fetchall()
-        if created:
-            assistant_msg_id = created[0]["id"]
-            updates = MessageUpdate(
-                token_count=token_count,
-                latency_ms=total_latency_ms,
+        await message_service.update_message(db, assistant_msg_id, updates)
+        # Try to set ai_model — column may not exist in old databases
+        try:
+            await db.execute(
+                "UPDATE messages SET ai_model = ? WHERE id = ?",
+                (model, assistant_msg_id)
             )
-            await message_service.update_message(db, assistant_msg_id, updates)
-            # Try to set ai_model — column may not exist in old databases
-            try:
-                await db.execute(
-                    "UPDATE messages SET ai_model = ? WHERE id = ?",
-                    (model, assistant_msg_id)
-                )
-                await db.commit()
-            except Exception:
-                pass
+            await db.commit()
+        except Exception:
+            pass
 
         yield sse_event({
             "token": "",
             "done": True,
-            "message_id": message_id,
+            "message_id": assistant_msg_id,
             "token_count": token_count,
             "latency_ms": total_latency_ms,
             "ai_model": model,

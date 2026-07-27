@@ -448,7 +448,7 @@ const SessionsPage = () => {
         ...voiceMsg,
         id: sent.id,
         audioUrl: sent.voice_note?.file_path
-          ? `http://localhost:8000/storage/${sent.voice_note.file_path.split('/').pop()}`
+          ? `http://localhost:8000/storage/${sent.voice_note.file_path.replace(/\\/g, '/').replace(/^storage\//, '')}`
           : null,
         transcription: transcriptToSend,
         timestamp: new Date(sent.created_at).toLocaleTimeString('en-US', {

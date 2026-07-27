@@ -48,19 +48,38 @@ async def get_messages_by_session(
     session_id: str,
     limit: int = 100,
     offset: int = 0
-) -> List[Message]:
-    """Get all messages for a session, ordered by created_at asc."""
+) -> List["MessageWithVoice"]:
+    """Get all messages for a session with voice note data, ordered by created_at asc."""
+    from ..models.message import MessageWithVoice
     cursor = await db.execute(
         """
-        SELECT * FROM messages
-        WHERE session_id = ? AND deleted_at IS NULL
-        ORDER BY created_at ASC
+        SELECT m.*, vn.id as vn_id, vn.message_id as vn_message_id, vn.file_path as vn_file_path,
+               vn.mime_type as vn_mime_type, vn.duration_seconds as vn_duration_seconds,
+               vn.transcript as vn_transcript, vn.sample_rate as vn_sample_rate,
+               vn.language as vn_language, vn.created_at as vn_created_at, vn.deleted_at as vn_deleted_at
+        FROM messages m
+        LEFT JOIN voice_notes vn ON vn.message_id = m.id AND vn.deleted_at IS NULL
+        WHERE m.session_id = ? AND m.deleted_at IS NULL
+        ORDER BY m.created_at ASC
         LIMIT ? OFFSET ?
         """,
         (session_id, limit, offset)
     )
     rows = await cursor.fetchall()
-    return [Message(**dict(row)) for row in rows]
+
+    messages = []
+    for row in rows:
+        d = dict(row)
+        # Extract voice note fields — strip 'vn_' prefix
+        vn_fields = {k[3:]: v for k, v in d.items() if k.startswith('vn_')}
+        if vn_fields.get('id'):
+            from ..models.voice_note import VoiceNote
+            vn = VoiceNote(**vn_fields)
+            msg = MessageWithVoice(**{k: v for k, v in d.items() if not k.startswith('vn_')}, voice_note=vn)
+        else:
+            msg = Message(**{k: v for k, v in d.items() if not k.startswith('vn_')})
+        messages.append(msg)
+    return messages
 
 
 async def get_message_count(db: aiosqlite.Connection, session_id: str) -> int:

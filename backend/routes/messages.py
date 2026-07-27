@@ -4,7 +4,7 @@ from typing import List, Optional
 import uuid
 from datetime import datetime
 from ..database.connection import get_db
-from ..models.message import Message, MessageCreate, MessageUpdate
+from ..models.message import Message, MessageCreate, MessageUpdate, MessageWithVoice
 from ..models.voice_note import VoiceNote, VoiceNoteCreate, VoiceNoteUpdate
 from ..services import message_service, session_service, storage_service, groq_service
 
@@ -33,7 +33,7 @@ async def create_message(
     return message
 
 
-@router.get("/session/{session_id}", response_model=List[Message])
+@router.get("/session/{session_id}", response_model=List[MessageWithVoice])
 async def list_messages(
     session_id: str,
     limit: int = Query(100, ge=1, le=500),
@@ -117,7 +117,7 @@ async def transcribe_voice_note(
     return {"file_path": file_path, "transcript": transcript}
 
 
-@router.post("/session/{session_id}/voice", response_model=Message)
+@router.post("/session/{session_id}/voice", response_model=MessageWithVoice)
 async def create_voice_message(
     session_id: str,
     file: UploadFile = File(...),
@@ -170,15 +170,16 @@ async def create_voice_message(
         language=language,
         transcript=transcript,
     )
-    await storage_service.create_voice_note(db, voice_note_data)
+    voice_note = await storage_service.create_voice_note(db, voice_note_data)
 
     # Update session last_message_at
     await session_service.update_last_message_time(db, session_id)
 
-    # Fetch and return created message
+    # Fetch and return created message with voice note
     cursor = await db.execute("SELECT * FROM messages WHERE id = ?", (message_id,))
     row = await cursor.fetchone()
-    return Message(**dict(row))
+    msg_dict = dict(row)
+    return MessageWithVoice(**msg_dict, voice_note=voice_note)
 
 
 @router.get("/{message_id}/voice", response_model=VoiceNote)

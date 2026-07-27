@@ -34,8 +34,12 @@ const useChatStore = create((set, get) => ({
     }
     set(state => {
       const { [tempId]: _, ...restTokens } = state.streamingTokens
+      // Replace placeholder if it exists, otherwise append
+      const exists = state.messages.some(m => m.id === tempId)
       return {
-        messages: [...state.messages, message],
+        messages: exists
+          ? state.messages.map(m => m.id === tempId ? message : m)
+          : [...state.messages, message],
         streamingTokens: restTokens,
         isTyping: false,
       }
@@ -58,7 +62,7 @@ const useChatStore = create((set, get) => ({
           messageType: m.message_type,
           transcription: voiceNote?.transcript || null,
           audioUrl: voiceNote?.file_path
-            ? `http://localhost:8000/storage/${voiceNote.file_path.split('/').pop()}`
+            ? `http://localhost:8000/storage/${voiceNote.file_path.replace(/\\/g, '/').replace(/^storage\//, '')}`
             : null,
           createdAt: new Date(m.created_at),
           timestamp: new Date(m.created_at).toLocaleTimeString('en-US', {
