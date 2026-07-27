@@ -5,11 +5,27 @@ const InputComposer = ({
   onSendMessage,
   onStartRecording,
   onStopRecording,
+  onEditSubmit,
+  editingMessage,
   isRecording = false,
   disabled = false
 }) => {
   const [inputValue, setInputValue] = useState('')
   const textareaRef = useRef(null)
+
+  // When editingMessage changes, populate the textarea with its content
+  useEffect(() => {
+    if (editingMessage) {
+      setInputValue(editingMessage.content || '')
+      // Focus and position cursor at end
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus()
+          textareaRef.current.selectionStart = textareaRef.current.value.length
+        }
+      }, 0)
+    }
+  }, [editingMessage])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -21,17 +37,33 @@ const InputComposer = ({
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (inputValue.trim() && !disabled) {
-      onSendMessage(inputValue.trim())
-      setInputValue('')
+    const text = inputValue.trim()
+    if (!text || disabled) return
+
+    if (editingMessage && onEditSubmit) {
+      onEditSubmit(text)
+    } else {
+      onSendMessage(text)
     }
+    setInputValue('')
   }
 
   const handleKeyDown = (e) => {
+    if (e.key === 'Escape' && editingMessage) {
+      // Cancel edit
+      setInputValue('')
+      onEditSubmit && onEditSubmit(null) // signal cancel
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
     }
+  }
+
+  const cancelEdit = () => {
+    setInputValue('')
+    onEditSubmit && onEditSubmit(null)
   }
 
   const canSend = inputValue.trim().length > 0 && !disabled
@@ -42,6 +74,21 @@ const InputComposer = ({
       onSubmit={handleSubmit}
       className="border-t border-border bg-surface px-4 py-3"
     >
+      {/* Edit mode header */}
+      {editingMessage && (
+        <div className="max-w-3xl mx-auto flex items-center justify-between mb-2">
+          <span className="text-xs text-text-secondary italic">
+            Editing message
+          </span>
+          <button
+            type="button"
+            onClick={cancelEdit}
+            className="text-xs text-text-tertiary hover:text-text-primary transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       <div className="max-w-3xl mx-auto flex items-end gap-2">
         {/* Attachment button (future) */}
         <IconButton

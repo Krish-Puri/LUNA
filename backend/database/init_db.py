@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS messages (
     updated_at TIMESTAMP,
     token_count INTEGER,
     latency_ms INTEGER,
-    model_used TEXT,
+    ai_model TEXT,
     deleted_at TIMESTAMP NULL
 );
 

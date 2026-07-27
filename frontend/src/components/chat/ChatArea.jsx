@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble'
 import Avatar from '../ui/Avatar'
 
-const ChatArea = ({ messages = [], isTyping = false }) => {
+const ChatArea = ({ messages = [], isTyping = false, onEdit }) => {
   const messagesEndRef = useRef(null)
 
   // Auto-scroll to bottom on new messages
@@ -40,6 +40,7 @@ const ChatArea = ({ messages = [], isTyping = false }) => {
             key={message.id || index}
             message={message}
             showAvatar={true}
+            onEdit={onEdit}
           />
         ))}
 

@@ -16,6 +16,9 @@ class MessageCreate(MessageBase):
 
 class MessageUpdate(BaseModel):
     content: Optional[str] = None
+    token_count: Optional[int] = None
+    latency_ms: Optional[int] = None
+    ai_model: Optional[str] = None
 
 
 class Message(MessageBase):
@@ -25,7 +28,7 @@ class Message(MessageBase):
     updated_at: Optional[datetime] = None
     token_count: Optional[int] = None
     latency_ms: Optional[int] = None
-    model_used: Optional[str] = None
+    ai_model: Optional[str] = None
     deleted_at: Optional[datetime] = None
 
     model_config = {"protected_namespaces": ()}

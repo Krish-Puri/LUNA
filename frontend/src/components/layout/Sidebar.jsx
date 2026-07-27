@@ -215,9 +215,7 @@ const Sidebar = ({
   }
 
   const handleNewSession = () => {
-    const newId = `session-${Date.now()}`
-    if (onNewSession) onNewSession(newId)
-    navigate(`/session/${newId}`)
+    if (onNewSession) onNewSession()
   }
 
   const renderSessionItem = (session) => (

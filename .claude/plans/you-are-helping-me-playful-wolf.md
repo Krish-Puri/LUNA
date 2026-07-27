@@ -1,63 +1,67 @@
-# Plan: Connect Frontend to Backend API
+# Plan: Message Editing for LUNA
 
 ## Context
 
-The backend is fully built and running on port 8000 with all CRUD endpoints for sessions, messages, users, and voice notes. The frontend currently uses mock data in Zustand stores. This plan replaces that mock data with real API calls so the app works end-to-end.
+Users should be able to edit a message they already sent. When they do:
+1. The message is updated in the DB
+2. All LUNA responses that came after that message are deleted
+3. LUNA re-responds to the edited message (new stream)
+4. The old LUNA response disappears from the chat UI
 
-No authentication exists yet — the app will use a single default user stored in localStorage.
+This mirrors how ChatGPT / Claude handles message editing.
 
 ---
 
 ## Approach
 
-### API Layer (`frontend/src/api/`)
+### Backend
 
-Create a thin fetch-based API client:
-
+**`backend/services/message_service.py`** — add:
+```python
+async def delete_messages_after(db, session_id: str, after_message_id: str) -> int:
+    """Soft-delete all assistant messages created after a given message."""
+    now = datetime.utcnow().isoformat()
+    cursor = await db.execute(
+        """UPDATE messages SET deleted_at = ?
+           WHERE session_id = ? AND role = 'assistant'
+             AND created_at > (SELECT created_at FROM messages WHERE id = ?)
+             AND deleted_at IS NULL""",
+        (now, session_id, after_message_id)
+    )
+    await db.commit()
+    return cursor.rowcount
 ```
-frontend/src/api/
-├── client.js       # Base fetch wrapper, base URL = http://localhost:8000
-├── sessions.js     # GET/POST /api/sessions
-├── messages.js     # GET/POST /api/messages
-└── users.js        # POST/GET /api/users
+
+**`backend/routes/chat.py`** — `event_generator` checks if `message_id` is an existing message (user editing). If so:
+1. Update the existing message content via `message_service.update_message`
+2. Call `message_service.delete_messages_after` to remove subsequent LUNA responses
+3. Continue streaming the new LUNA response
+
+### Frontend
+
+**`frontend/src/store/chatStore.js`** — add:
+```javascript
+editMessage: (id, newContent) => {
+  set(state => ({
+    messages: state.messages.map(m =>
+      m.id === id ? { ...m, content: newContent, edited: true } : m
+    ),
+  }))
+}
 ```
 
-### User Flow (No Auth)
+**`frontend/src/components/chat/MessageBubble.jsx`** — on user messages:
+- Show pencil/edit icon on hover
+- On click: call `onEdit(message)` prop
 
-- On app load, check `localStorage` for `luna_user_id`
-- If missing, `POST /api/users/` with `{ email: "default@luna.app", name: "Luna User" }`, store returned `id` in localStorage
-- All subsequent calls pass `user_id` as a query param
+**`frontend/src/components/chat/InputComposer.jsx`** — add edit mode:
+- New props: `editingMessage` (the message being edited), `onEditSubmit(newContent)`
+- When `editingMessage` is set: show "Edit message" label, submit goes to `onEditSubmit`
 
-### Session Store Refactor (`sessionStore.js`)
-
-Replace `generateMockSessions()` with:
-- `fetchSessions(userId)` → `GET /api/sessions/?user_id=X`
-- `createSession(userId)` → `POST /api/sessions/`
-- `deleteSession(sessionId)` → `DELETE /api/sessions/{id}`
-- Map backend `last_message_at` → compute `group` (today/yesterday/earlier) client-side
-- Keep `preview`, `time`, `id`, `messages` from backend response
-
-### Chat Store Refactor (`chatStore.js`)
-
-- `loadMessages(sessionId)` → `GET /api/messages/session/{id}`
-- `sendMessage(sessionId, content)` → `POST /api/messages/session/{id}/` with `{ role: "user", content }`
-- Keep existing `addUserMessage`, `addLunaMessage`, `setTyping` — those handle UI state
-
-### SessionsPage Changes (`SessionsPage.jsx`)
-
-1. On mount, ensure user exists → load sessions
-2. Remove `setTimeout` LUNA simulation — messages come from backend
-3. Wire voice recording → `POST /api/messages/session/{id}/voice` with `FormData`
-4. After voice upload, poll or refetch messages to show the new message
-
-### Sidebar Grouping
-
-Backend returns `last_message_at` per session. Frontend computes `group`:
-```
-if today → "today"
-if yesterday → "yesterday"
-if older → "earlier"
-```
+**`frontend/src/pages/SessionsPage.jsx`**:
+- `editingMessageRef` tracks the message being edited
+- `handleEditMessage(message)` — sets editing state, focuses InputComposer
+- `handleSendMessage` checks if editing: calls `PATCH /api/messages/{id}` then streams LUNA, removes all messages after the edited one from local state
 
 ---
 
@@ -65,33 +69,20 @@ if older → "earlier"
 
 | File | Change |
 |------|--------|
-| `frontend/src/api/client.js` | New — base fetch wrapper |
-| `frontend/src/api/sessions.js` | New — session API calls |
-| `frontend/src/api/messages.js` | New — message API calls |
-| `frontend/src/api/users.js` | New — user API calls |
-| `frontend/src/store/sessionStore.js` | Replace mock data with API calls |
-| `frontend/src/store/chatStore.js` | Replace mock loading with API calls |
-| `frontend/src/pages/SessionsPage.jsx` | Replace LUNA simulation with real API, wire voice upload |
-| `frontend/src/store/voiceStore.js` | Add upload action |
-
----
-
-## Voice Upload Flow
-
-1. User stops recording → `audioBlob` in `voiceStore`
-2. `SessionsPage` calls `POST /api/messages/session/{id}/voice` with `FormData` containing the audio file
-3. Backend saves file, creates message + voice_note record
-4. Frontend refetches messages to show the new voice message
+| `backend/services/message_service.py` | Add `delete_messages_after()` function |
+| `backend/routes/chat.py` | `event_generator`: detect edit, update message, delete subsequent LUNA responses |
+| `frontend/src/store/chatStore.js` | Add `editMessage(id, newContent)` action |
+| `frontend/src/components/chat/MessageBubble.jsx` | Hover edit icon on user messages; "(edited)" label |
+| `frontend/src/components/chat/InputComposer.jsx` | `editingMessage` + `onEditSubmit` props |
+| `frontend/src/pages/SessionsPage.jsx` | Wire edit flow; on edit, remove subsequent messages from UI |
 
 ---
 
 ## Verification
 
-1. Start backend: `python -m uvicorn backend.main:app --reload --port 8000`
-2. Start frontend: `npm run dev` (from `frontend/`)
-3. Open http://localhost:5173
-4. Create new session → appears in sidebar
-5. Send text message → appears in chat, session preview updates
-6. Record + send voice note → appears in chat with audio player
-7. Reload page → sessions persist from database
-8. Delete session → disappears from sidebar
+1. Start backend + frontend
+2. Send "I'm feeling anxious" → LUNA responds
+3. Hover over the user message → pencil icon appears → click it
+4. Message enters edit mode → change to "I'm feeling great actually!" → submit
+5. Old LUNA response disappears → new LUNA response appears tailored to edited message
+6. `npm run build` → 0 errors

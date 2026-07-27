@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 import aiosqlite
 from typing import List, Optional
+import uuid
+from datetime import datetime
 from ..database.connection import get_db
 from ..models.message import Message, MessageCreate, MessageUpdate
 from ..models.voice_note import VoiceNote, VoiceNoteCreate, VoiceNoteUpdate
-from ..services import message_service, session_service, storage_service
+from ..services import message_service, session_service, storage_service, groq_service
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
@@ -60,7 +62,7 @@ async def update_message(
     updates: MessageUpdate,
     db: aiosqlite.Connection = Depends(get_db)
 ):
-    """Update a message (content, token_count, latency_ms, model_used)."""
+    """Update a message (content, token_count, latency_ms, ai_model)."""
     message = await message_service.update_message(db, message_id, updates)
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
@@ -81,12 +83,47 @@ async def delete_message(
 
 # --- Voice Note Endpoints ---
 
+@router.post("/session/{session_id}/transcribe")
+async def transcribe_voice_note(
+    session_id: str,
+    file: UploadFile = File(...),
+    language: str = Form("en"),
+    db: aiosqlite.Connection = Depends(get_db)
+):
+    """
+    Save audio file and transcribe it via Whisper. Returns { file_path, transcript }.
+    Does NOT create any DB records — callers handle that on Send.
+    """
+    session = await session_service.get_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    mime_to_ext = {
+        "audio/webm": "webm",
+        "audio/mp4": "m4a",
+        "audio/mpeg": "mp3",
+        "audio/wav": "wav",
+        "audio/ogg": "ogg",
+    }
+    extension = mime_to_ext.get(file.content_type, "webm")
+
+    audio_bytes = await file.read()
+    file_path = await storage_service.save_voice_note_file(audio_bytes, extension)
+
+    transcript = await groq_service.transcribe_audio(
+        audio_bytes, file.filename or "audio.webm", language
+    )
+
+    return {"file_path": file_path, "transcript": transcript}
+
+
 @router.post("/session/{session_id}/voice", response_model=Message)
 async def create_voice_message(
     session_id: str,
     file: UploadFile = File(...),
     duration_seconds: Optional[float] = Form(None),
     language: str = Form("en"),
+    transcript: Optional[str] = Form(None),
     db: aiosqlite.Connection = Depends(get_db)
 ):
     """
@@ -112,9 +149,7 @@ async def create_voice_message(
     file_path = await storage_service.save_voice_note_file(audio_bytes, extension)
 
     # Create message
-    import uuid
     message_id = str(uuid.uuid4())
-    from datetime import datetime
     now = datetime.utcnow().isoformat()
 
     await db.execute(
@@ -132,7 +167,8 @@ async def create_voice_message(
         file_path=file_path,
         mime_type=file.content_type,
         duration_seconds=duration_seconds,
-        language=language
+        language=language,
+        transcript=transcript,
     )
     await storage_service.create_voice_note(db, voice_note_data)
 

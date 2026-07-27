@@ -78,13 +78,22 @@ async def update_message(
     message_id: str,
     updates: MessageUpdate
 ) -> Optional[Message]:
-    """Update message fields (content, token_count, latency_ms, model_used)."""
+    """Update message fields (content, token_count, latency_ms, ai_model)."""
     update_fields = []
     values = []
 
     if updates.content is not None:
         update_fields.append("content = ?")
         values.append(updates.content)
+    if updates.token_count is not None:
+        update_fields.append("token_count = ?")
+        values.append(updates.token_count)
+    if updates.latency_ms is not None:
+        update_fields.append("latency_ms = ?")
+        values.append(updates.latency_ms)
+    if updates.ai_model is not None:
+        update_fields.append("ai_model = ?")
+        values.append(updates.ai_model)
 
     if not update_fields:
         return await get_message(db, message_id)
@@ -101,6 +110,30 @@ async def update_message(
     return await get_message(db, message_id)
 
 
+async def get_conversation_context(
+    db: aiosqlite.Connection,
+    session_id: str,
+    limit: int = 20,
+) -> list[dict]:
+    """
+    Return last N non-deleted user+assistant messages as [{role, content}] dicts,
+    ordered by created_at ASC for Groq context.
+    """
+    cursor = await db.execute(
+        """
+        SELECT role, content FROM messages
+        WHERE session_id = ? AND deleted_at IS NULL
+          AND role IN ('user', 'assistant')
+          AND content IS NOT NULL
+        ORDER BY created_at ASC
+        LIMIT ?
+        """,
+        (session_id, limit),
+    )
+    rows = await cursor.fetchall()
+    return [{"role": r["role"], "content": r["content"]} for r in rows]
+
+
 async def soft_delete_message(db: aiosqlite.Connection, message_id: str) -> bool:
     """Soft delete a message."""
     now = datetime.utcnow().isoformat()
@@ -110,3 +143,28 @@ async def soft_delete_message(db: aiosqlite.Connection, message_id: str) -> bool
     )
     await db.commit()
     return cursor.rowcount > 0
+
+
+async def delete_messages_after(
+    db: aiosqlite.Connection,
+    session_id: str,
+    after_message_id: str,
+) -> int:
+    """
+    Soft-delete all assistant messages in a session that were created
+    after a given message. Used when a user edits a message — subsequent
+    LUNA responses become stale and need to be regenerated.
+    """
+    now = datetime.utcnow().isoformat()
+    cursor = await db.execute(
+        """
+        UPDATE messages SET deleted_at = ?
+        WHERE session_id = ?
+          AND role = 'assistant'
+          AND created_at > (SELECT created_at FROM messages WHERE id = ?)
+          AND deleted_at IS NULL
+        """,
+        (now, session_id, after_message_id),
+    )
+    await db.commit()
+    return cursor.rowcount

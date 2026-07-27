@@ -4,14 +4,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-from .routes import sessions, messages, users, health
+from .routes import sessions, messages, users, health, chat
 from .database.init_db import init_database
+from .services import luna_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database on startup."""
+    """Initialize database and warm caches on startup."""
     await init_database()
+    # Warm the LUNA system prompt cache
+    try:
+        await luna_service.load_active_system_prompt()
+    except Exception:
+        pass  # non-fatal — will use default prompt
     yield
 
 
@@ -41,6 +47,7 @@ app.include_router(health.router)
 app.include_router(users.router)
 app.include_router(sessions.router)
 app.include_router(messages.router)
+app.include_router(chat.router)
 
 
 @app.get("/")

@@ -7,6 +7,42 @@ const useChatStore = create((set, get) => ({
   isSending: false,
   error: null,
 
+  // Streaming token accumulators — { tempId: accumulatedString }
+  streamingTokens: {},
+
+  // Append a streaming token to the accumulator for a given temp message ID
+  addStreamingToken: (tempId, token) => {
+    set(state => ({
+      streamingTokens: {
+        ...state.streamingTokens,
+        [tempId]: (state.streamingTokens[tempId] || '') + token,
+      },
+    }))
+  },
+
+  // Replace streaming accumulator with a confirmed final message
+  finalizeStreamingMessage: (tempId, finalContent, confirmedId) => {
+    const message = {
+      id: confirmedId || tempId,
+      role: 'assistant',
+      content: finalContent,
+      messageType: 'text',
+      timestamp: new Date().toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+    }
+    set(state => {
+      const { [tempId]: _, ...restTokens } = state.streamingTokens
+      return {
+        messages: [...state.messages, message],
+        streamingTokens: restTokens,
+        isTyping: false,
+      }
+    })
+    return message
+  },
+
   // Load messages for a session from API
   loadMessages: async (sessionId) => {
     set({ isSending: true, error: null })
@@ -102,6 +138,23 @@ const useChatStore = create((set, get) => ({
   replaceMessage: (tempId, confirmedMessage) => {
     set(state => ({
       messages: state.messages.map(m => m.id === tempId ? confirmedMessage : m),
+    }))
+  },
+
+  // Edit a user message content and mark it as edited
+  editMessage: (id, newContent) => {
+    set(state => ({
+      messages: state.messages.map(m =>
+        m.id === id ? { ...m, content: newContent, edited: true } : m
+      ),
+    }))
+  },
+
+  // Remove all messages from a given index onward (used when editing a message
+  // and LUNA's subsequent responses are being regenerated)
+  truncateMessagesFrom: (fromIndex) => {
+    set(state => ({
+      messages: state.messages.slice(0, fromIndex + 1),
     }))
   },
 
