@@ -95,21 +95,34 @@ const MessageBubble = ({ message, showAvatar = true, onEdit }) => {
 
       {/* Message content */}
       <div className={`flex flex-col max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
+        {/* Bubble — voice uses neutral treatment, no user/LUNA color split */}
         <div
           className={`
             px-4 py-3 rounded-2xl
-            ${isUser
-              ? 'bg-user-bubble rounded-tr-md'
-              : 'bg-luna-bubble border border-luna-border rounded-tl-md'
+            ${isVoice
+              ? 'bg-bg-secondary border border-border'
+              : isUser
+                ? 'bg-user-bubble rounded-tr-md'
+                : 'bg-luna-bubble border border-luna-border rounded-tl-md'
             }
           `}
         >
+          {/* Voice note label */}
+          {isVoice && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <svg className="w-3 h-3 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-14 0m7 7v4m-4 0h8m-8-8a4 4 0 018 0" />
+              </svg>
+              <span className="text-xs text-text-tertiary">Voice note</span>
+            </div>
+          )}
+
           {/* Voice note player */}
           {isVoice && message.audioUrl && (
             <VoicePlayer audioUrl={message.audioUrl} />
           )}
 
-          {/* Text content — hidden for voice messages (transcript shown below) */}
+          {/* Text content — hidden for voice messages */}
           {message.content && !isVoice && (
             <p className="text-sm text-text-primary whitespace-pre-wrap">
               {message.content}
@@ -119,18 +132,18 @@ const MessageBubble = ({ message, showAvatar = true, onEdit }) => {
               )}
             </p>
           )}
-
-          {/* Transcription */}
-          {message.transcription && (
-            <p className="text-xs text-text-tertiary mt-2 italic border-t border-border pt-2">
-              "{message.transcription}"
-            </p>
-          )}
         </div>
+
+        {/* Transcript caption — outside bubble, below it */}
+        {isVoice && message.transcription && (
+          <p className="text-xs italic text-text-tertiary mt-1 px-1">
+            "{message.transcription}"
+          </p>
+        )}
 
         {/* Timestamp + edit indicator */}
         {message.timestamp && (
-          <span className="text-xs text-text-tertiary mt-1 px-1 flex items-center gap-1">
+          <span className="text-xs text-text-tertiary mt-1.5 px-1 flex items-center gap-1">
             {message.edited && <span className="italic">(edited)</span>}
             {/* Edit button — visible on hover for user messages */}
             {isUser && onEdit && (

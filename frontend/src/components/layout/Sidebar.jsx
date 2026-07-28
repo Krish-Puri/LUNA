@@ -130,7 +130,7 @@ const SessionGroupHeader = ({ title, count }) => (
 
 // Session item
 const SessionItem = ({ session, isActive, onClick, onRename, onDelete, onArchive, onUnarchive, onTogglePin }) => (
-  <div className={`group relative flex items-center w-full px-4 py-3 text-left transition-colors duration-150 hover:bg-bg-tertiary ${isActive ? 'bg-bg-tertiary' : ''}`}>
+  <div className={`group relative flex items-center w-full px-4 py-2.5 text-left transition-colors duration-150 hover:bg-bg-tertiary ${isActive ? 'bg-bg-tertiary' : ''}`}>
     {/* Clickable area */}
     <button
       onClick={onClick}
@@ -146,7 +146,7 @@ const SessionItem = ({ session, isActive, onClick, onRename, onDelete, onArchive
           {session.title || session.preview || 'New conversation'}
         </p>
       </div>
-      <p className="text-xs text-text-tertiary mt-0.5">
+      <p className="text-xs text-text-tertiary mt-1">
         {session.isArchived && <span className="mr-1 opacity-60">[Archived]</span>}
         {session.time}
       </p>
@@ -233,7 +233,7 @@ const Sidebar = ({
   )
 
   return (
-    <aside className="w-[280px] h-full bg-bg-secondary border-r border-border flex flex-col">
+    <aside className="w-[280px] h-full bg-white/40 backdrop-blur-md border-r border-white/20 flex flex-col">
       {/* Logo */}
       <LunaLogo />
 
@@ -247,7 +247,7 @@ const Sidebar = ({
       <div className="flex-1 overflow-y-auto">
         {/* Today */}
         {groupedSessions.today.length > 0 && (
-          <div className="mb-2">
+          <div className="mb-3">
             <SessionGroupHeader title="Today" count={groupedSessions.today.length} />
             {groupedSessions.today.map(renderSessionItem)}
           </div>
@@ -255,7 +255,7 @@ const Sidebar = ({
 
         {/* Yesterday */}
         {groupedSessions.yesterday.length > 0 && (
-          <div className="mb-2">
+          <div className="mb-3">
             <SessionGroupHeader title="Yesterday" count={groupedSessions.yesterday.length} />
             {groupedSessions.yesterday.map(renderSessionItem)}
           </div>
@@ -263,7 +263,7 @@ const Sidebar = ({
 
         {/* Earlier */}
         {groupedSessions.earlier.length > 0 && (
-          <div className="mb-2">
+          <div className="mb-3">
             <SessionGroupHeader title="Earlier" count={groupedSessions.earlier.length} />
             {groupedSessions.earlier.map(renderSessionItem)}
           </div>
@@ -271,7 +271,7 @@ const Sidebar = ({
 
         {/* Archived sessions */}
         {archivedSessions.length > 0 && (
-          <div className="mb-2">
+          <div className="mb-3">
             <SessionGroupHeader title="Archived" count={archivedSessions.length} />
             {archivedSessions.map(renderSessionItem)}
           </div>

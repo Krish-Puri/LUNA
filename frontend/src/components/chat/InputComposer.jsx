@@ -72,7 +72,7 @@ const InputComposer = ({
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-t border-border bg-surface px-4 py-3"
+      className="border-t border-white/20 bg-white/40 backdrop-blur-md px-4 py-4 shadow-sm"
     >
       {/* Edit mode header */}
       {editingMessage && (
@@ -89,7 +89,7 @@ const InputComposer = ({
           </button>
         </div>
       )}
-      <div className="max-w-3xl mx-auto flex items-end gap-2">
+      <div className="max-w-3xl mx-auto flex items-center gap-2">
         {/* Attachment button (future) */}
         <IconButton
           type="button"
@@ -164,7 +164,7 @@ const InputComposer = ({
       {/* Recording indicator */}
       {isRecording && (
         <div className="max-w-3xl mx-auto mt-2 flex items-center gap-2 text-xs text-accent">
-          <span className="w-2 h-2 bg-error rounded-full animate-pulse" />
+          <span className="w-2.5 h-2.5 bg-error rounded-full animate-pulse" />
           <span>Recording... tap mic to stop</span>
         </div>
       )}

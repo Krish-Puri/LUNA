@@ -16,7 +16,12 @@ const ChatArea = ({ messages = [], isTyping = false, onEdit }) => {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center px-8">
           {/* LUNA icon */}
-          <div className="w-16 h-16 rounded-full bg-accent-light mx-auto mb-6 flex items-center justify-center">
+          {/* Decorative wave */}
+          <svg className="w-16 h-6 mx-auto mb-4 opacity-20" viewBox="0 0 64 24" fill="none">
+            <path d="M0 12 Q8 4 16 12 T32 12 T48 12 T64 12" stroke="#B85C5C" strokeWidth="2" strokeLinecap="round" fill="none"/>
+            <path d="M0 18 Q8 10 16 18 T32 18 T48 18 T64 18" stroke="#B85C5C" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.5"/>
+          </svg>
+          <div className="w-16 h-16 rounded-full bg-accent-light mx-auto mb-4 flex items-center justify-center">
             <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
               <span className="text-text-inverse font-semibold">L</span>
             </div>
@@ -34,7 +39,7 @@ const ChatArea = ({ messages = [], isTyping = false, onEdit }) => {
 
   return (
     <div className="flex-1 overflow-y-auto py-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-4">
         {messages.map((message, index) => (
           <MessageBubble
             key={message.id || index}

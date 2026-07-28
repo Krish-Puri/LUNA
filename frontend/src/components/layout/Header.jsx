@@ -26,7 +26,7 @@ const Header = ({ title, subtitle, showBackButton = false, onBack, onRename }) =
   }
 
   return (
-    <header className="h-16 px-4 flex items-center border-b border-border bg-surface">
+    <header className="h-16 px-4 flex items-center border-b border-white/20 bg-white/40 backdrop-blur-md">
       {/* Back button (mobile/sidebar context) */}
       {showBackButton && (
         <IconButton
@@ -52,7 +52,7 @@ const Header = ({ title, subtitle, showBackButton = false, onBack, onRename }) =
               if (e.key === 'Enter') commitEdit()
               if (e.key === 'Escape') cancelEdit()
             }}
-            className="w-full bg-transparent text-base font-semibold text-text-primary border-b border-accent outline-none px-0.5"
+            className="w-full bg-bg-secondary rounded-md text-base font-semibold text-text-primary border border-accent outline-none px-1 py-1"
             autoFocus
           />
         ) : (

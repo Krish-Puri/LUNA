@@ -5,6 +5,7 @@ import Header from '../components/layout/Header'
 import MainContent from '../components/layout/MainContent'
 import ChatArea from '../components/chat/ChatArea'
 import InputComposer from '../components/chat/InputComposer'
+import Grainient from '../components/ui/Grainient'
 import useSessionStore from '../store/sessionStore'
 import useChatStore from '../store/chatStore'
 import useVoiceStore from '../store/voiceStore'
@@ -41,7 +42,7 @@ const VoicePreviewBar = ({
   const isError = transcriptionStatus === 'error'
 
   return (
-    <div className="border-t border-border bg-surface px-4 py-3">
+    <div className="border-t border-white/20 bg-white/40 backdrop-blur-md px-4 py-3">
       <div className="max-w-3xl mx-auto flex flex-col gap-3">
         {/* Audio row */}
         <div className="flex items-center gap-3">
@@ -148,6 +149,7 @@ const SessionsPage = () => {
   const [mediaRecorder, setMediaRecorder] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const [editingMessage, setEditingMessage] = useState(null)  // message being edited
+  const [isSending, setIsSending] = useState(false)  // guard against concurrent handleSendMessage calls
 
   // AbortController for cancelling in-flight SSE streams on session change
   const streamControllerRef = useRef(null)
@@ -221,6 +223,9 @@ const SessionsPage = () => {
   // Handle sending a text message — streams LUNA's response via SSE
   const handleSendMessage = async (content) => {
     if (!content.trim()) return
+    if (isSending) return
+    setIsSending(true)
+    try {
     const currentSessionId = await getOrCreateSession()
     if (!currentSessionId) return
 
@@ -311,9 +316,12 @@ const SessionsPage = () => {
         }
       }
     } catch (err) {
-      if (err.name === 'AbortError') return  // stream was cancelled — normal
+      if (err.name === 'AbortError') { setIsSending(false); return }  // stream was cancelled — normal
       console.error('Stream error:', err)
       setTyping(false)
+    }
+    } finally {
+      setIsSending(false)
     }
   }
 
@@ -618,7 +626,36 @@ const SessionsPage = () => {
   const activeSession = sessions.find(s => s.id === (activeSessionId || sessionId))
 
   return (
-    <div className="h-screen flex bg-bg-primary">
+    <div className="h-screen flex relative">
+      {/* Full-page animated gradient background */}
+      <Grainient
+        className="fixed inset-0 z-0"
+        color1="#ca6363"
+        color2="#f5e6d3"
+        color3="#b85c5c"
+        timeSpeed={0.15}
+        colorBalance={0.05}
+        warpStrength={0.8}
+        warpFrequency={4.5}
+        warpSpeed={1.5}
+        warpAmplitude={40.0}
+        blendAngle={15.0}
+        blendSoftness={0.08}
+        rotationAmount={400}
+        noiseScale={1.8}
+        grainAmount={0.06}
+        grainScale={1.2}
+        grainAnimated={false}
+        contrast={1.1}
+        gamma={1.0}
+        saturation={0.9}
+        centerX={0.0}
+        centerY={0.0}
+        zoom={1.1}
+      />
+
+      {/* UI layer — above the gradient */}
+      <div className="relative z-10 flex h-full w-full">
       {/* Left Sidebar */}
       <Sidebar
         sessions={sessions}
@@ -671,6 +708,7 @@ const SessionsPage = () => {
           isRecording={recordingState === 'recording'}
         />
       </MainContent>
+      </div>
     </div>
   )
 }
