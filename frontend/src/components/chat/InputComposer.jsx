@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import IconButton from '../ui/IconButton'
+import VoiceMicButton from '../ui/VoiceMicButton'
 
 const InputComposer = ({
   onSendMessage,
-  onStartRecording,
-  onStopRecording,
+  onVoiceStop,   // (blob) => void — called when VoiceMicButton finishes recording
   onEditSubmit,
   editingMessage,
   isRecording = false,
@@ -67,7 +67,6 @@ const InputComposer = ({
   }
 
   const canSend = inputValue.trim().length > 0 && !disabled
-  const canRecord = !disabled && !isRecording
 
   return (
     <form
@@ -124,29 +123,11 @@ const InputComposer = ({
           />
         </div>
 
-        {/* Microphone / Recording button */}
-        {canRecord ? (
-          <IconButton
-            type="button"
-            variant="accent"
-            onClick={onStartRecording}
-            disabled={disabled}
-            className="flex-shrink-0"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-14 0m7 7v4m-4 0h8m-8-8a4 4 0 018 0" />
-            </svg>
-          </IconButton>
-        ) : isRecording ? (
-          <IconButton
-            type="button"
-            variant="accent"
-            onClick={onStopRecording}
-            className="flex-shrink-0 bg-error hover:bg-error"
-          >
-            <div className="w-5 h-5 rounded-sm bg-text-inverse" />
-          </IconButton>
-        ) : null}
+        {/* Microphone — VoiceMicButton manages its own recording state internally */}
+        <VoiceMicButton
+          onStop={onVoiceStop}
+          disabled={disabled}
+        />
 
         {/* Send button */}
         <IconButton
@@ -160,14 +141,6 @@ const InputComposer = ({
           </svg>
         </IconButton>
       </div>
-
-      {/* Recording indicator */}
-      {isRecording && (
-        <div className="max-w-3xl mx-auto mt-2 flex items-center gap-2 text-xs text-accent">
-          <span className="w-2.5 h-2.5 bg-error rounded-full animate-pulse" />
-          <span>Recording... tap mic to stop</span>
-        </div>
-      )}
     </form>
   )
 }

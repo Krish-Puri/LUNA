@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Sidebar from '../components/layout/Sidebar'
 import Header from '../components/layout/Header'
@@ -135,7 +135,6 @@ const SessionsPage = () => {
     recordingState,
     audioBlob,
     audioUrl,
-    startRecording,
     stopRecording,
     clearRecording,
     transcriptionStatus,
@@ -148,7 +147,6 @@ const SessionsPage = () => {
   } = useVoiceStore()
 
   // Local state
-  const [mediaRecorder, setMediaRecorder] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const [editingMessage, setEditingMessage] = useState(null)  // message being edited
   const [isSending, setIsSending] = useState(false)  // guard against concurrent handleSendMessage calls
@@ -586,64 +584,25 @@ const SessionsPage = () => {
     }
   }
 
-  // Handle starting voice recording
-  const handleStartRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 48000,
-          channelCount: 1,
-        },
-      })
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
-      const chunks = []
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data)
-        }
+  // Handle voice recording result — called by VoiceMicButton after MediaRecorder stops
+  const handleVoiceStop = useCallback(async (blob) => {
+    stopRecording(blob)
+    const currentSessionId = await getOrCreateSession()
+    if (currentSessionId) {
+      setTranscriptionStatus('transcribing')
+      try {
+        const result = await messagesApi.transcribeAudio(
+          currentSessionId,
+          blob,
+          usePreferencesStore.getState().language
+        )
+        setTranscriptionResult(result.transcript || '')
+      } catch (err) {
+        console.error('Transcription failed:', err)
+        setTranscriptionError(err.message)
       }
-
-      recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        stopRecording(blob)
-        stream.getTracks().forEach(track => track.stop())
-
-        // Ensure we have a session before transcribing (may need to create one)
-        const currentSessionId = await getOrCreateSession()
-        if (currentSessionId && useVoiceStore.getState().audioBlob) {
-          setTranscriptionStatus('transcribing')
-          try {
-            const result = await messagesApi.transcribeAudio(
-              currentSessionId,
-              blob,
-              usePreferencesStore.getState().language
-            )
-            setTranscriptionResult(result.transcript || '')
-          } catch (err) {
-            console.error('Transcription failed:', err)
-            setTranscriptionError(err.message)
-          }
-        }
-      }
-
-      recorder.start(100) // collect data every 100ms for smoother recording
-      setMediaRecorder(recorder)
-      startRecording()
-    } catch (err) {
-      console.error('Failed to start recording:', err)
     }
-  }
-
-  // Handle stopping voice recording
-  const handleStopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop()
-    }
-    // Transcription is kicked off inside the onstop callback above
-  }
+  }, [getOrCreateSession])
 
   // Get active session for header
   const activeSession = sessions.find(s => s.id === (activeSessionId || sessionId))
@@ -736,8 +695,7 @@ const SessionsPage = () => {
         {/* Input Composer */}
         <InputComposer
           onSendMessage={handleSendMessage}
-          onStartRecording={handleStartRecording}
-          onStopRecording={handleStopRecording}
+          onVoiceStop={handleVoiceStop}
           onEditSubmit={handleEditSubmit}
           editingMessage={editingMessage}
           isRecording={recordingState === 'recording'}
