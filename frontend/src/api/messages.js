@@ -37,6 +37,10 @@ export async function updateMessage(messageId, data) {
   })
 }
 
+export async function clearConversation(sessionId) {
+  return request(`/api/messages/session/${sessionId}/clear`, { method: 'POST' })
+}
+
 export async function uploadVoiceNote(sessionId, audioBlob, durationSeconds, transcript) {
   const formData = new FormData()
   formData.append('file', audioBlob, 'voice.webm')

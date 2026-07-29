@@ -7,6 +7,7 @@ import ChatArea from '../components/chat/ChatArea'
 import InputComposer from '../components/chat/InputComposer'
 import Grainient from '../components/ui/Grainient'
 import SettingsPanel from '../components/settings/SettingsPanel'
+import SessionMenuPanel from '../components/settings/SessionMenuPanel'
 import useSessionStore from '../store/sessionStore'
 import useChatStore from '../store/chatStore'
 import useVoiceStore from '../store/voiceStore'
@@ -584,6 +585,19 @@ const SessionsPage = () => {
     }
   }
 
+  // Clear all messages in the active session
+  const handleClearConversation = async (sessionId) => {
+    if (!window.confirm('Clear all messages in this conversation? The session will remain.')) return
+    await messagesApi.clearConversation(sessionId)
+    clearMessages()
+  }
+
+  // Trigger summary generation for a session
+  const handleGenerateSummary = async (sessionId) => {
+    // TODO: wire to backend summary trigger endpoint when available
+    console.info('[SessionsPage] Generate summary requested for session:', sessionId)
+  }
+
   // Handle voice recording result — called by VoiceMicButton after MediaRecorder stops
   const handleVoiceStop = useCallback(async (blob) => {
     stopRecording(blob)
@@ -647,6 +661,18 @@ const SessionsPage = () => {
 
       {/* Settings slide-in panel */}
       <SettingsPanel />
+
+      {/* Session menu slide-in panel */}
+      <SessionMenuPanel
+        session={activeSession}
+        onRename={handleRenameFromHeader}
+        onGenerateSummary={handleGenerateSummary}
+        onArchive={archiveSession}
+        onUnarchive={unarchiveSession}
+        onDelete={handleDelete}
+        onClear={handleClearConversation}
+        onExport={() => {}} // placeholder
+      />
 
       {/* UI layer — above the gradient */}
       <div className="relative z-10 flex h-full w-full">

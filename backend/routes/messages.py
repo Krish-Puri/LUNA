@@ -214,3 +214,13 @@ async def update_transcript(
         db, voice.id, VoiceNoteUpdate(transcript=transcript)
     )
     return updated
+
+
+@router.post("/session/{session_id}/clear")
+async def clear_conversation(
+    session_id: str,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Soft-delete all messages in a session. Returns the count of deleted messages."""
+    deleted = await message_service.soft_delete_all_for_session(db, session_id)
+    return {"deleted": deleted}

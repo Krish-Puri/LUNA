@@ -187,3 +187,17 @@ async def delete_messages_after(
     )
     await db.commit()
     return cursor.rowcount
+
+
+async def soft_delete_all_for_session(db: aiosqlite.Connection, session_id: str) -> int:
+    """
+    Soft-delete every non-deleted message in a session.
+    Used when the user clears a conversation.
+    """
+    now = datetime.utcnow().isoformat()
+    cursor = await db.execute(
+        "UPDATE messages SET deleted_at = ? WHERE session_id = ? AND deleted_at IS NULL",
+        (now, session_id),
+    )
+    await db.commit()
+    return cursor.rowcount
