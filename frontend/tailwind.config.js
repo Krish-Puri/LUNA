@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -7,34 +8,34 @@ export default {
   theme: {
     extend: {
       colors: {
-        // LUNA Warm White Palette
+        // LUNA Warm White Palette — all use CSS vars so dark mode switches automatically
         bg: {
-          primary: '#FDFBF9',
-          secondary: '#F7F4F1',
-          tertiary: '#EFEBE7',
+          primary: 'var(--color-bg-primary)',
+          secondary: 'var(--color-bg-secondary)',
+          tertiary: 'var(--color-bg-tertiary)',
         },
-        surface: '#FFFFFF',
+        surface: 'var(--color-surface)',
         border: {
-          DEFAULT: '#E8E3DE',
-          strong: '#D4CEC8',
+          DEFAULT: 'var(--color-border)',
+          strong: 'var(--color-border-strong)',
         },
         text: {
-          primary: '#2D2A28',
-          secondary: '#6B6560',
-          tertiary: '#9C958F',
-          inverse: '#FDFBF9',
+          primary: 'var(--color-text-primary)',
+          secondary: 'var(--color-text-secondary)',
+          tertiary: 'var(--color-text-tertiary)',
+          inverse: 'var(--color-text-inverse)',
         },
         accent: {
-          DEFAULT: '#B85C5C',
-          hover: '#A14D4D',
-          light: '#F5E8E8',
+          DEFAULT: 'var(--color-accent)',
+          hover: 'var(--color-accent-hover)',
+          light: 'var(--color-accent-light)',
         },
         luna: {
-          bubble: '#FFFFFF',
-          border: '#E8E3DE',
+          bubble: 'var(--color-luna-bubble)',
+          border: 'var(--color-luna-border)',
         },
         user: {
-          bubble: '#F7F4F1',
+          bubble: 'var(--color-user-bubble)',
         },
         success: '#7B9E7B',
         warning: '#C9A86C',

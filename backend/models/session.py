@@ -49,3 +49,4 @@ class SessionWithPreview(Session):
     preview: Optional[str] = None
     message_count: int = 0
     time: Optional[str] = None  # Human-readable relative time
+    summary: Optional[str] = None  # Auto-generated session summary (from Groq)

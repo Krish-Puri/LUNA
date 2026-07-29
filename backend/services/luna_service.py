@@ -70,14 +70,33 @@ async def load_active_system_prompt() -> str:
 async def build_luna_messages(
     conversation_history: list[dict],
     user_content: str,
+    user_id: str | None = None,
 ) -> list[dict]:
     """
     Assemble the full messages list for Groq:
-    [ {role: "system", content: <system_prompt>},
+    [ {role: "system", content: <system_prompt>[ + memory block]},
       ...conversation_history (role+content pairs)...,
       {role: "user", content: <user_content>} ]
+
+    If user_id is provided, relevant memories are fetched and injected into the
+    system prompt as a "### Relevant Memory" block.
     """
     system_prompt_text = await load_active_system_prompt()
+
+    # Inject memory context if user_id is available
+    if user_id:
+        try:
+            from . import memory_service
+            db = await aiosqlite.connect(DATABASE_PATH)
+            db.row_factory = aiosqlite.Row
+            memories = await memory_service.get_memories_for_context(db, user_id, user_content, limit=5)
+            await db.close()
+            memory_block = memory_service.format_memories_for_context(memories)
+            if memory_block:
+                system_prompt_text = system_prompt_text.rstrip() + "\n\n" + memory_block
+        except Exception:
+            pass  # memory injection is best-effort
+
     messages = [{"role": "system", "content": system_prompt_text}]
     messages.extend(conversation_history)
     messages.append({"role": "user", "content": user_content})

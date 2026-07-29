@@ -8,7 +8,12 @@ from ..services import session_service
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 
-def session_to_preview(session: Session, message_count: int = 0, preview: str = "") -> SessionWithPreview:
+def session_to_preview(
+    session: Session,
+    message_count: int = 0,
+    preview: str = "",
+    summary: str | None = None,
+) -> SessionWithPreview:
     """Convert a Session to SessionWithPreview with computed fields."""
     from datetime import datetime
 
@@ -42,7 +47,8 @@ def session_to_preview(session: Session, message_count: int = 0, preview: str = 
         **session.model_dump(),
         message_count=message_count,
         preview=preview,
-        time=time_str
+        time=time_str,
+        summary=summary,
     )
 
 
@@ -64,10 +70,11 @@ async def list_sessions(
     """List all sessions for a user, with previews."""
     sessions = await session_service.get_sessions_by_user(db, user_id, include_archived)
 
+    from ..services import message_service, summary_service
+
     result = []
     for session in sessions:
         # Get message count and first message preview
-        from ..services import message_service
         messages = await message_service.get_messages_by_session(db, session.id, limit=1)
         first_msg = messages[0] if messages else None
         preview_text = ""
@@ -79,7 +86,10 @@ async def list_sessions(
                 preview_text = first_msg.content or ""
         preview = preview_text[:50] if preview_text else ""
 
-        result.append(session_to_preview(session, len(messages), preview))
+        # Get existing summary, if any
+        summary = await summary_service.get_summary(db, session.id)
+
+        result.append(session_to_preview(session, len(messages), preview, summary))
 
     return result
 

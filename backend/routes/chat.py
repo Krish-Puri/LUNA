@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 import aiosqlite
 
 from ..database.connection import get_db_connection
-from ..services import message_service, session_service, groq_service, luna_service
+from ..services import message_service, session_service, groq_service, luna_service, summary_service
 from ..models.message import MessageCreate, MessageUpdate
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -49,12 +49,52 @@ async def groq_stream_async(messages: list[dict], model: str):
         yield token
 
 
+# ------------------------------------------------------------------
+# Memory extraction — runs as fire-and-forget after each LUNA response
+# ------------------------------------------------------------------
+async def _extract_memories(
+    db: aiosqlite.Connection,
+    session_id: str,
+    user_id: str | None,
+    user_message: str,
+    luna_response: str,
+    source_message_id: str,
+) -> None:
+    """
+    Check memory_enabled preference, then extract and save memories.
+    Safe to fire-and-forget — all errors are swallowed.
+    """
+    if not user_id:
+        return
+    try:
+        cursor = await db.execute(
+            "SELECT memory_enabled FROM preferences WHERE user_id = ?",
+            (user_id,)
+        )
+        row = await cursor.fetchone()
+        if not row or not row["memory_enabled"]:
+            return
+    except Exception:
+        return
 
+    try:
+        from ..services import memory_service
+        await memory_service.save_memories(
+            db, user_id, user_message, luna_response, source_message_id
+        )
+    except Exception as e:
+        print(f"[_extract_memories] failed: {e}")
+
+
+# ------------------------------------------------------------------
+# Main SSE event generator
+# ------------------------------------------------------------------
 async def event_generator(
     session_id: str,
     user_content: str,
     message_id: str,
     db: aiosqlite.Connection,
+    user_id: str | None = None,
 ):
     """
     Async generator yielding SSE tokens from Groq.
@@ -77,13 +117,13 @@ async def event_generator(
         await message_service.update_message(
             db, message_id, MessageUpdate(content=user_content)
         )
-        deleted = await message_service.delete_messages_after(db, session_id, message_id)
+        await message_service.delete_messages_after(db, session_id, message_id)
 
     # Fetch conversation context from DB (excludes soft-deleted messages)
     history = await message_service.get_conversation_context(db, session_id, limit=20)
 
-    # Build full messages list for Groq
-    luna_messages = await luna_service.build_luna_messages(history, user_content)
+    # Build full messages list for Groq (with memory context if user_id available)
+    luna_messages = await luna_service.build_luna_messages(history, user_content, user_id)
 
     # Pre-create the assistant message with a known UUID so the frontend can
     # replace its streaming placeholder by ID when the done event arrives
@@ -141,10 +181,23 @@ async def event_generator(
             "ai_model": model,
         })
 
+        # Trigger async summarization (fire-and-forget, every 10 messages)
+        asyncio.create_task(
+            summary_service.check_and_summarize(session_id, token_count)
+        )
+
+        # Trigger async memory extraction (fire-and-forget)
+        asyncio.create_task(
+            _extract_memories(db, session_id, user_id, user_content, full_text, assistant_msg_id)
+        )
+
     except Exception as e:
         yield sse_event({"error": str(e), "done": True})
 
 
+# ------------------------------------------------------------------
+# Route handlers
+# ------------------------------------------------------------------
 @router.post("/session/{session_id}/stream")
 async def chat_stream(
     session_id: str,
@@ -173,7 +226,7 @@ async def chat_stream(
 
     # Stream — db connection stays open for the entire iteration
     return StreamingResponse(
-        event_generator(session_id, content, message_id, db),
+        event_generator(session_id, content, message_id, db, session.user_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -212,7 +265,7 @@ async def voice_chat_stream(
     await session_service.update_last_message_time(db, session_id)
 
     return StreamingResponse(
-        event_generator(session_id, transcript, msg_id, db),
+        event_generator(session_id, transcript, msg_id, db, session.user_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

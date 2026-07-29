@@ -6,9 +6,11 @@ import MainContent from '../components/layout/MainContent'
 import ChatArea from '../components/chat/ChatArea'
 import InputComposer from '../components/chat/InputComposer'
 import Grainient from '../components/ui/Grainient'
+import SettingsPanel from '../components/settings/SettingsPanel'
 import useSessionStore from '../store/sessionStore'
 import useChatStore from '../store/chatStore'
 import useVoiceStore from '../store/voiceStore'
+import usePreferencesStore from '../store/preferencesStore'
 import * as usersApi from '../api/users'
 import * as messagesApi from '../api/messages'
 import { streamChat, parseSSEData } from '../api/chat'
@@ -150,16 +152,29 @@ const SessionsPage = () => {
   const [isInitialized, setIsInitialized] = useState(false)
   const [editingMessage, setEditingMessage] = useState(null)  // message being edited
   const [isSending, setIsSending] = useState(false)  // guard against concurrent handleSendMessage calls
+  const [grainSettings, setGrainSettings] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('luna_grainient_settings') || 'null')
+    } catch { return null }
+  })
 
   // AbortController for cancelling in-flight SSE streams on session change
   const streamControllerRef = useRef(null)
 
-  // Initialize on mount: ensure user + load sessions
+  // Initialize on mount: ensure user + load sessions + load preferences
   useEffect(() => {
     const init = async () => {
+      // Apply dark mode class before first paint to avoid flash
+      const savedTheme = localStorage.getItem('luna_theme') || 'system'
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      if (savedTheme === 'dark' || (savedTheme === 'system' && prefersDark)) {
+        document.documentElement.classList.add('dark')
+      }
+
       try {
         const uid = await ensureUser()
         await initialize(uid)
+        usePreferencesStore.getState().loadPreferences(uid)
         setIsInitialized(true)
       } catch (err) {
         console.error('Failed to initialize:', err)
@@ -167,6 +182,13 @@ const SessionsPage = () => {
       }
     }
     init()
+  }, [])
+
+  // Listen for grain settings changes from SettingsPanel
+  useEffect(() => {
+    const handler = (e) => setGrainSettings(e.detail)
+    window.addEventListener('luna-grain-settings-change', handler)
+    return () => window.removeEventListener('luna-grain-settings-change', handler)
   }, [])
 
   // Handle session change from URL
@@ -596,7 +618,8 @@ const SessionsPage = () => {
           try {
             const result = await messagesApi.transcribeAudio(
               currentSessionId,
-              useVoiceStore.getState().audioBlob
+              blob,
+              usePreferencesStore.getState().language
             )
             setTranscriptionResult(result.transcript || '')
           } catch (err) {
@@ -625,20 +648,29 @@ const SessionsPage = () => {
   // Get active session for header
   const activeSession = sessions.find(s => s.id === (activeSessionId || sessionId))
 
+  // Resolve grain settings: localStorage or sensible defaults
+  const effectiveGrain = grainSettings || {
+    color1: '#ca6363',
+    color2: '#f5e6d3',
+    color3: '#b85c5c',
+    timeSpeed: 0.15,
+    warpAmplitude: 40.0,
+  }
+
   return (
     <div className="h-screen flex relative">
       {/* Full-page animated gradient background */}
       <Grainient
         className="fixed inset-0 z-0"
-        color1="#ca6363"
-        color2="#f5e6d3"
-        color3="#b85c5c"
-        timeSpeed={0.15}
+        color1={effectiveGrain.color1}
+        color2={effectiveGrain.color2}
+        color3={effectiveGrain.color3}
+        timeSpeed={effectiveGrain.timeSpeed ?? 0.15}
         colorBalance={0.05}
         warpStrength={0.8}
         warpFrequency={4.5}
         warpSpeed={1.5}
-        warpAmplitude={40.0}
+        warpAmplitude={effectiveGrain.warpAmplitude ?? 40.0}
         blendAngle={15.0}
         blendSoftness={0.08}
         rotationAmount={400}
@@ -653,6 +685,9 @@ const SessionsPage = () => {
         centerY={0.0}
         zoom={1.1}
       />
+
+      {/* Settings slide-in panel */}
+      <SettingsPanel />
 
       {/* UI layer — above the gradient */}
       <div className="relative z-10 flex h-full w-full">

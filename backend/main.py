@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-from .routes import sessions, messages, users, health, chat
+from .routes import sessions, messages, users, health, chat, memory
 from .database.init_db import init_database
 from .services import luna_service
 
@@ -48,6 +48,7 @@ app.include_router(users.router)
 app.include_router(sessions.router)
 app.include_router(messages.router)
 app.include_router(chat.router)
+app.include_router(memory.router)
 
 
 @app.get("/")
