@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 import aiosqlite
+import logging
 from typing import List
 from ..database.connection import get_db
 from ..models.session import Session, SessionCreate, SessionUpdate, SessionWithPreview
 from ..services import session_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
@@ -69,25 +72,35 @@ async def list_sessions(
 ):
     """List all sessions for a user, with previews."""
     sessions = await session_service.get_sessions_by_user(db, user_id, include_archived)
+    logger.info(f"[SESSION-BACKEND] list_sessions — user_id={user_id!r}, include_archived={include_archived}, returning {len(sessions)} sessions")
+    for s in sessions:
+        logger.info(f"[SESSION-BACKEND]   session: id={s.id}, title={s.title_custom or s.title_auto!r}, is_archived={s.is_archived}, updated_at={s.updated_at}")
 
     from ..services import message_service, summary_service
 
     result = []
     for session in sessions:
-        # Get message count and first message preview
-        messages = await message_service.get_messages_by_session(db, session.id, limit=1)
-        first_msg = messages[0] if messages else None
-        preview_text = ""
-        if first_msg:
-            # Voice messages: use transcript from voice_note; text messages: use content
-            if first_msg.message_type == "voice" and first_msg.voice_note:
-                preview_text = first_msg.voice_note.transcript or ""
-            else:
-                preview_text = first_msg.content or ""
-        preview = preview_text[:50] if preview_text else ""
+        messages = []
+        preview = ""
+        summary = None
+        try:
+            # Get message count and first message preview
+            messages = await message_service.get_messages_by_session(db, session.id, limit=1)
+            first_msg = messages[0] if messages else None
+            preview_text = ""
+            if first_msg:
+                # Voice messages: use transcript from voice_note; text messages: use content
+                if first_msg.message_type == "voice" and first_msg.voice_note:
+                    preview_text = first_msg.voice_note.transcript or ""
+                else:
+                    preview_text = first_msg.content or ""
+            preview = preview_text[:50] if preview_text else ""
 
-        # Get existing summary, if any
-        summary = await summary_service.get_summary(db, session.id)
+            # Get existing summary, if any
+            summary = await summary_service.get_summary(db, session.id)
+        except Exception as e:
+            logger.warning(f"[SESSION-BACKEND] list_sessions — failed to get preview/summary for session {session.id}: {e}")
+            # Keep defaults: messages=[], preview="", summary=None
 
         result.append(session_to_preview(session, len(messages), preview, summary))
 

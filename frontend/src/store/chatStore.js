@@ -11,13 +11,33 @@ const useChatStore = create((set, get) => ({
   streamingTokens: {},
 
   // Append a streaming token to the accumulator for a given temp message ID
+  // Also marks the temp message as streaming so VoiceControls can disable itself
   addStreamingToken: (tempId, token) => {
-    set(state => ({
-      streamingTokens: {
-        ...state.streamingTokens,
-        [tempId]: (state.streamingTokens[tempId] || '') + token,
-      },
-    }))
+    set(state => {
+      const updatedMessages = state.messages.map(m =>
+        m.id === tempId ? { ...m, streaming: true } : m
+      )
+      // If the temp message doesn't exist yet, add it as a placeholder
+      const messageExists = state.messages.some(m => m.id === tempId)
+      const placeholder = messageExists ? null : {
+        id: tempId,
+        role: 'assistant',
+        content: '',
+        messageType: 'text',
+        streaming: true,
+        timestamp: new Date().toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+        }),
+      }
+      return {
+        messages: messageExists ? updatedMessages : [...state.messages, placeholder],
+        streamingTokens: {
+          ...state.streamingTokens,
+          [tempId]: (state.streamingTokens[tempId] || '') + token,
+        },
+      }
+    })
   },
 
   // Replace streaming accumulator with a confirmed final message
@@ -27,6 +47,7 @@ const useChatStore = create((set, get) => ({
       role: 'assistant',
       content: finalContent,
       messageType: 'text',
+      streaming: false,
       timestamp: new Date().toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
@@ -49,15 +70,23 @@ const useChatStore = create((set, get) => ({
 
   // Load messages for a session from API
   loadMessages: async (sessionId) => {
-    // Preserve any optimistic (temp-ID) messages that haven't been confirmed yet.
-    // This prevents in-flight voice notes / unconfirmed messages from being wiped
-    // out when the loadMessages effect fires during an active upload.
-    const optimisticMessages = get().messages.filter(m =>
-      m.id && (m.id.startsWith('voice-') || m.id.startsWith('user-') || m.id.startsWith('luna-'))
-    )
+    // Mark loading state immediately so concurrent handleSendMessage flows
+    // (which also call loadMessages via effect) see isSending: true.
     set({ isSending: true, error: null })
     try {
       const msgs = await messagesApi.getMessages(sessionId)
+      console.log('[MSG-LIFE] chatStore.loadMessages API returned — confirmed msg count:', msgs.length)
+
+      // Re-read optimistic state AFTER the await.
+      // By this point replaceMessage has already upgraded any confirmed messages
+      // from temp IDs (user-/voice-/luna-) to server UUIDs, so they won't match
+      // the filter and won't be double-merged. Only genuinely unconfirmed messages
+      // (e.g. in-flight voice notes still awaiting their API response) are kept.
+      const optimisticMessages = get().messages.filter(m =>
+        m.id && (m.id.startsWith('voice-') || m.id.startsWith('user-') || m.id.startsWith('luna-'))
+      )
+      console.log('[MSG-LIFE] chatStore.loadMessages — optimistic count:', optimisticMessages.length, '| optimistic IDs:', optimisticMessages.map(m => m.id))
+
       // Map backend message fields to frontend shape
       const mapped = msgs.map(m => {
         const voiceNote = m.voice_note
@@ -77,8 +106,10 @@ const useChatStore = create((set, get) => ({
           }),
         }
       })
+      console.log('[MSG-LIFE] chatStore.loadMessages setState — mapped:', mapped.length, '+ optimistic:', optimisticMessages.length, '= total:', mapped.length + optimisticMessages.length)
       set({ messages: [...mapped, ...optimisticMessages], isSending: false })
     } catch (err) {
+      console.error('[MSG-LIFE] chatStore.loadMessages ERROR:', err.message)
       set({ error: err.message, isSending: false })
     }
   },
@@ -130,6 +161,7 @@ const useChatStore = create((set, get) => ({
       role: 'assistant',
       content,
       messageType: 'text',
+      streaming: true,
       timestamp: new Date().toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
