@@ -67,7 +67,13 @@ const useSessionStore = create((set, get) => ({
         const match = window.location.pathname.match(/^\/session\/([^/]+)/)
         return match ? match[1] : null
       })()
-      const savedActiveId = localStorage.getItem(SESSION_STORAGE_KEY) || urlSessionId || null
+      const savedActiveId = localStorage.getItem(SESSION_STORAGE_KEY) || null
+      // Only restore savedActiveId if it's still valid — a session deleted on another
+      // device (or that predates a schema change) would otherwise be set as active
+      // without existing in the sessions list, causing the sidebar to miss it.
+      const validActiveId = (savedActiveId && mapped.some(s => s.id === savedActiveId))
+        ? savedActiveId
+        : (urlSessionId || null)
       // [DIAGNOSTIC Stage 2] Map and group distribution
       console.log('[SESSION] initialize — savedActiveId:', savedActiveId, '| mapped count:', mapped.length)
       console.log('[SESSION] initialize — mapped IDs:', mapped.map(s => s.id))
@@ -80,7 +86,7 @@ const useSessionStore = create((set, get) => ({
       console.log('[SESSION] initialize — sessions BEFORE set:', get().sessions.length, '|', get().sessions.map(s => s.id))
       set({
         sessions: mapped,
-        activeSessionId: savedActiveId || null,
+        activeSessionId: validActiveId,
         isLoading: false,
       })
       console.log('[SESSION] initialize — sessions AFTER set:', get().sessions.map(s => s.id))

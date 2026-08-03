@@ -1,12 +1,18 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-from .routes import sessions, messages, users, health, chat, memory
+# Configure root logger so all `logging.getLogger(__name__)` calls output.
+# level=INFO ensures [SESSION-BACKEND], [TTS-BACKEND] etc. are visible.
+logging.basicConfig(level=logging.INFO, format="%(name)s — %(levelname)s — %(message)s")
+
+from .routes import sessions, messages, users, health, chat, memory, tts
 from .database.init_db import init_database
-from .services import luna_service
+from .services import luna_service, tts_service
 
 
 @asynccontextmanager
@@ -18,6 +24,8 @@ async def lifespan(app: FastAPI):
         await luna_service.load_active_system_prompt()
     except Exception:
         pass  # non-fatal — will use default prompt
+    # Warm the Piper TTS voice model in the background (takes ~11s, done once)
+    asyncio.create_task(asyncio.to_thread(tts_service.warm_voice))
     yield
 
 
@@ -49,6 +57,7 @@ app.include_router(sessions.router)
 app.include_router(messages.router)
 app.include_router(chat.router)
 app.include_router(memory.router)
+app.include_router(tts.router)
 
 
 @app.get("/")

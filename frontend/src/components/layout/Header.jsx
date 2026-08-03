@@ -2,7 +2,14 @@ import { useState, useRef } from 'react'
 import IconButton from '../ui/IconButton'
 import useSessionMenuStore from '../../store/sessionMenuStore'
 
-const Header = ({ title, subtitle, showBackButton = false, onBack, onRename }) => {
+const getGreeting = () => {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+const Header = ({ title, subtitle, sessionTitle, showBackButton = false, onBack, onRename }) => {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(title || '')
   const inputRef = useRef(null)
@@ -57,15 +64,22 @@ const Header = ({ title, subtitle, showBackButton = false, onBack, onRename }) =
             autoFocus
           />
         ) : (
-          <h1
-            onClick={onRename ? startEditing : undefined}
-            className={`text-base font-semibold text-text-primary truncate cursor-pointer hover:text-accent transition-colors ${onRename ? 'select-none' : ''}`}
-            title="Click to rename"
-          >
-            {title || 'LUNA'}
-          </h1>
+          <>
+            <h1
+              onClick={onRename ? startEditing : undefined}
+              className={`text-base font-semibold text-text-primary truncate cursor-pointer hover:text-accent transition-colors ${onRename ? 'select-none' : ''}`}
+              title="Click to rename"
+            >
+              {title || 'LUNA'}
+            </h1>
+            {sessionTitle && !editing && (
+              <p className="text-xs text-text-tertiary italic line-clamp-1">
+                {getGreeting()} · {sessionTitle}
+              </p>
+            )}
+          </>
         )}
-        {subtitle && !editing && (
+        {subtitle && !editing && !sessionTitle && (
           <p className="text-xs text-text-tertiary">
             {subtitle}
           </p>

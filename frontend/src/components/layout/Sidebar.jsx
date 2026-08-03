@@ -205,6 +205,21 @@ const Sidebar = ({
 }) => {
   const navigate = useNavigate()
 
+  // [DIAGNOSTIC] Stage 4 — trace where the active session disappears
+  useEffect(() => {
+    console.log('[SESSION] Sidebar render — sessions received:', sessions.length, '| IDs:', sessions.map(s => s.id))
+    console.log('[SESSION] Sidebar render — activeSessionId prop:', activeSessionId)
+    console.log('[SESSION] Sidebar render — groupedSessions.today IDs:', groupedSessions.today.map(s => s.id))
+    console.log('[SESSION] Sidebar render — groupedSessions.yesterday IDs:', groupedSessions.yesterday.map(s => s.id))
+    console.log('[SESSION] Sidebar render — groupedSessions.earlier IDs:', groupedSessions.earlier.map(s => s.id))
+    console.log('[SESSION] Sidebar render — archived IDs:', archivedSessions.map(s => s.id))
+    console.log('[SESSION] Sidebar render — is archived?', archivedSessions.some(s => s.id === activeSessionId))
+    console.log('[SESSION] Sidebar render — is in today?', groupedSessions.today.some(s => s.id === activeSessionId))
+    console.log('[SESSION] Sidebar render — is in yesterday?', groupedSessions.yesterday.some(s => s.id === activeSessionId))
+    console.log('[SESSION] Sidebar render — is in earlier?', groupedSessions.earlier.some(s => s.id === activeSessionId))
+    console.log('[SESSION] Sidebar render — is anywhere in sessions?', sessions.some(s => s.id === activeSessionId))
+  }, [sessions, activeSessionId])
+
   // Separate active (non-archived) from archived sessions
   const activeSessions = sessions.filter(s => !s.isArchived)
   const archivedSessions = sessions.filter(s => s.isArchived)

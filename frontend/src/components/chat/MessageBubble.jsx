@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import Avatar from '../ui/Avatar'
+import VoiceControls from './VoiceControls'
 
 const formatTime = (seconds) => {
   if (!Number.isFinite(seconds)) return '0:00'
@@ -124,13 +125,17 @@ const MessageBubble = ({ message, showAvatar = true, onEdit }) => {
 
           {/* Text content — hidden for voice messages */}
           {message.content && !isVoice && (
-            <p className="text-sm text-text-primary whitespace-pre-wrap">
-              {message.content}
-              {/* Blinking cursor while LUNA is streaming a response */}
-              {message.role === 'assistant' && String(message.id).startsWith('luna-') && (
-                <span className="inline-block w-2 h-4 bg-accent ml-0.5 animate-pulse align-middle" />
-              )}
-            </p>
+            <>
+              <p className="text-sm text-text-primary whitespace-pre-wrap">
+                {message.content}
+                {/* Blinking cursor while LUNA is streaming a response */}
+                {message.role === 'assistant' && String(message.id).startsWith('luna-') && (
+                  <span className="inline-block w-2 h-4 bg-accent ml-0.5 animate-pulse align-middle" />
+                )}
+              </p>
+              {/* Listen to Luna — only for assistant messages */}
+              {isLuna && <VoiceControls messageId={message.id} content={message.content} streaming={!!message.streaming} />}
+            </>
           )}
         </div>
 
