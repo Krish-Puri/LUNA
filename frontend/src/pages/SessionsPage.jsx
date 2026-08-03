@@ -196,15 +196,12 @@ const SessionsPage = () => {
   // Handle session change from URL — skips if sessionId is undefined to avoid
   // overwriting the activeSessionId that initialize() just restored from localStorage.
   useEffect(() => {
-    console.log('[SESSION] URL effect — sessionId:', sessionId, '| isInitialized:', isInitialized, '| activeSessionId before:', activeSessionId)
     if (!isInitialized || !sessionId) return
-    console.log('[SESSION] URL effect calling setActiveSession — sessionId:', sessionId)
     setActiveSession(sessionId)
   }, [sessionId, isInitialized])
 
   // Load messages when active session changes
   useEffect(() => {
-    console.log('[MSG-LIFE] loadMessages effect FIRED — activeSessionId:', activeSessionId, '| sessionId (URL):', sessionId, '| isInitialized:', isInitialized)
     if (!isInitialized) return
     const currentId = activeSessionId || sessionId
     if (currentId) {
@@ -217,7 +214,6 @@ const SessionsPage = () => {
           return
         }
       }
-      console.log('[MSG-LIFE] loadMessages effect calling loadMessages — currentId:', currentId)
       loadMessages(currentId)
     } else {
       clearMessages()
@@ -254,11 +250,9 @@ const SessionsPage = () => {
     if (!content.trim()) return
     if (isSending) return
     setIsSending(true)
-    console.log('[MSG-LIFE] handleSendMessage START — content length:', content.length, '| activeSessionId:', activeSessionId, '| sessionId (URL):', sessionId)
     try {
     const currentSessionId = await getOrCreateSession()
     if (!currentSessionId) return
-    console.log('[MSG-LIFE] getOrCreateSession resolved — currentSessionId:', currentSessionId)
 
     // Cancel any in-flight stream from a previous message
     if (streamControllerRef.current) {
@@ -282,7 +276,6 @@ const SessionsPage = () => {
     let confirmedUserMsg = null
     try {
       confirmedUserMsg = await messagesApi.sendMessage(currentSessionId, { content })
-      console.log('[MSG-LIFE] sendMessage API returned — optimistic ID:', userMsg.id, '| confirmed ID:', confirmedUserMsg.id)
       replaceMessage(userMsg.id, {
         ...userMsg,
         id: confirmedUserMsg.id,
@@ -291,7 +284,6 @@ const SessionsPage = () => {
           minute: '2-digit',
         }),
       })
-      console.log('[MSG-LIFE] replaceMessage DONE — message now has confirmed ID:', confirmedUserMsg.id)
     } catch (err) {
       console.error('Failed to store user message:', err)
     }
@@ -353,9 +345,7 @@ const SessionsPage = () => {
           } else {
             // Stream complete — add final LUNA message
             const confirmedId = data.message_id || tempLunaId
-            console.log('[MSG-LIFE] SSE done — tempId:', tempLunaId, '| confirmedId:', confirmedId)
             finalizeStreamingMessage(tempLunaId, accumulated, confirmedId)
-            console.log('[MSG-LIFE] finalizeStreamingMessage called')
           }
         }
       }
@@ -707,7 +697,6 @@ const SessionsPage = () => {
       {/* UI layer — above the gradient */}
       <div className="relative z-10 flex h-full w-full">
       {/* Left Sidebar */}
-      {console.log('[SESSION] SessionsPage Sidebar props — sessions.length:', sessions.length, '| IDs:', sessions.map(s => s.id), '| activeSessionId:', activeSessionId, '| sessionId (URL):', sessionId) || null}
       <Sidebar
         sessions={sessions}
         activeSessionId={activeSessionId || sessionId}

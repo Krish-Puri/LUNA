@@ -19,15 +19,21 @@ export async function generateTTS(messageId, content) {
 
 /**
  * Poll for TTS audio readiness.
- * Returns the audioUrl as a blob URL when ready.
+ * Returns the direct streaming URL when ready — no blob URL needed.
  * @param {string} messageId
  * @returns {Promise<{ status: 'ready'|'generating', audioUrl: string|null }>}
  */
 export async function checkTTSStatus(messageId) {
   const res = await fetch(`${BASE_URL}/api/tts/${messageId}`)
-  if (res.status === 404) return { status: 'generating', audioUrl: null }
+
+  // 404 or 202 both mean still generating
+  if (res.status === 404 || res.status === 202) {
+    return { status: 'generating', audioUrl: null }
+  }
   if (!res.ok) throw new Error(`TTS status check failed: ${res.status}`)
-  const blob = await res.blob()
-  const audioUrl = URL.createObjectURL(blob)
+
+  // 200 OK — file is ready; serve it directly.
+  // The browser handles range requests and streaming natively via the direct URL.
+  const audioUrl = `${BASE_URL}/api/tts/${messageId}`
   return { status: 'ready', audioUrl }
 }

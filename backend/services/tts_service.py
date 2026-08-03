@@ -18,7 +18,33 @@ _voice = None
 # Set to "done" (signaled) once warm_voice() has fully loaded the model.
 _warm_done = threading.Event()
 
+# ---------------------------------------------------------------------------
+# Generation state — replaces path.exists() as the readiness signal.
+# Transitions: idle -> generating -> ready | failed
+# ---------------------------------------------------------------------------
+_state: dict[str, str] = {}       # message_id -> 'generating' | 'ready' | 'failed'
+_state_lock = threading.Lock()
 
+
+def get_generation_state(message_id: str) -> str:
+    """Returns 'idle' if no entry exists."""
+    return _state.get(message_id, 'idle')
+
+
+def set_generation_state(message_id: str, state: str) -> None:
+    with _state_lock:
+        _state[message_id] = state
+        logger.info(f"[TTS-BACKEND] set_generation_state — {message_id}: {state}")
+
+
+def clear_generation_state(message_id: str) -> None:
+    with _state_lock:
+        _state.pop(message_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Voice loading
+# ---------------------------------------------------------------------------
 def _get_voice():
     """Load and cache the Piper voice (called from the thread pool)."""
     global _voice
@@ -33,46 +59,63 @@ def get_tts_dir() -> Path:
     return TTS_DIR
 
 
-def get_cached_path(message_id: str) -> str | None:
-    path = get_tts_dir() / f"{message_id}.wav"
-    exists = path.exists()
-    logger.info(f"[TTS-BACKEND] get_cached_path({message_id}) — exists: {exists}, path: {path}")
-    if exists:
-        return f"storage/tts/{message_id}.wav"
-    return None
-
-
+# ---------------------------------------------------------------------------
+# TTS synthesis
+# ---------------------------------------------------------------------------
 def _run_piper(text: str, output_path: str) -> None:
+    """
+    Synthesize text to a WAV file via Piper.
+    Writes to a .tmp file and atomically renames on success.
+    This prevents readers from ever seeing a half-written file.
+    """
     import wave
-    voice = _get_voice()  # reuse cached voice
-    with wave.open(output_path, 'wb') as wav_file:
-        voice.synthesize_wav(text, wav_file)
+    logger.info(f"[TTS-BACKEND] _run_piper — text length: {len(text)}")
+    tmp_path = output_path + '.tmp'
+    try:
+        voice = _get_voice()  # reuse cached voice
+        with wave.open(tmp_path, 'wb') as wav_file:
+            voice.synthesize_wav(text, wav_file)
+        os.replace(tmp_path, output_path)  # atomic on POSIX; move on Windows
+        file_size = os.path.getsize(output_path)
+        logger.info(f"[TTS-BACKEND] _run_piper — synthesis complete, file size: {file_size}")
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
 
 
 async def generate_tts(message_id: str, text: str) -> str:
     """
     Generate TTS via Piper in a thread pool (non-blocking).
-    Returns the relative storage path.
-
-    If the voice model is still warming up, this call blocks until warm-up
-    is complete so the first request never pays the 11s load penalty alone.
+    Transitions state: idle -> generating -> ready | failed.
+    Only returns when synthesis is fully complete.
     """
-    logger.info(f"[TTS-BACKEND] generate_tts — message_id: {message_id}, warm_done.is_set(): {_warm_done.is_set()}")
-    cached = get_cached_path(message_id)
-    logger.info(f"[TTS-BACKEND] generate_tts — cached: {cached}")
-    if cached:
-        return cached
+    logger.info(f"[TTS-BACKEND] generate_tts — message_id: {message_id}")
 
-    # Block until the voice is ready (warm_voice completed or is still running)
-    logger.info(f"[TTS-BACKEND] generate_tts — waiting for warm_done (blocking)...")
-    _warm_done.wait()
-    logger.info(f"[TTS-BACKEND] generate_tts — warm_done released, voice ready, starting synthesis")
+    # Idempotent: if already ready, return immediately without re-synthesizing.
+    if get_generation_state(message_id) == 'ready':
+        path = get_tts_dir() / f"{message_id}.wav"
+        file_size = path.stat().st_size
+        logger.info(f"[TTS-BACKEND] generate_tts — already ready, file size: {file_size}")
+        return f"storage/tts/{message_id}.wav"
 
-    output_path = str(get_tts_dir() / f"{message_id}.wav")
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(_executor, _run_piper, text, output_path)
-    logger.info(f"[TTS-BACKEND] generate_tts — synthesis DONE, output: {output_path}")
-    return f"storage/tts/{message_id}.wav"
+    set_generation_state(message_id, 'generating')
+
+    try:
+        _warm_done.wait()  # wait for voice to be ready (blocks only on first call)
+
+        output_path = str(get_tts_dir() / f"{message_id}.wav")
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(_executor, _run_piper, text, output_path)
+
+        set_generation_state(message_id, 'ready')
+        file_size = os.path.getsize(output_path)
+        logger.info(f"[TTS-BACKEND] generate_tts — state: ready, file size: {file_size}")
+        return f"storage/tts/{message_id}.wav"
+    except Exception as e:
+        set_generation_state(message_id, 'failed')
+        logger.error(f"[TTS-BACKEND] generate_tts — state: failed, error: {e}")
+        raise
 
 
 def warm_voice():

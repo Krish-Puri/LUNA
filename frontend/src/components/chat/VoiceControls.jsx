@@ -61,9 +61,15 @@ const VoiceControls = ({ messageId, content, streaming }) => {
   //  3. Already ready      — audio already exists, nothing to do
   //  4. Request in-flight — concurrent call protection via requestRef
   const requestTTS = useCallback(async (msgId, text) => {
-    if (streaming || isTempId(msgId) || !text || !text.trim()) return
-    if (status === 'loading' || status === 'ready') return
-    if (requestRef.current) return
+    if (streaming || isTempId(msgId) || !text || !text.trim()) {
+      return
+    }
+    if (status === 'loading' || status === 'ready') {
+      return
+    }
+    if (requestRef.current) {
+      return
+    }
     requestRef.current = true
     try {
       setLoading(msgId)
@@ -86,12 +92,22 @@ const VoiceControls = ({ messageId, content, streaming }) => {
   // --- Playback controls ---
   const toggle = () => {
     const audio = audioRef.current
-    if (!audio || !audioUrl) return
+    // Defensive: guard against null audioRef or null/missing src even if audioUrl
+    // is set in store — a stale blob URL (restored by persist on reload) would
+    // otherwise cause "no supported sources" because the tab that created the
+    // blob is gone.
+    if (!audio || !audioUrl || !audio.src) return
     if (playing) {
       audio.pause()
       setPlaying(false)
     } else {
-      audio.play()
+      audio.play().catch(err => {
+        // If playback fails (stale blob, CORS, decode error), clear the entry
+        // so the next click generates fresh TTS instead of hitting the same bad URL.
+        if (audioUrl?.startsWith('blob:')) {
+          useTtsStore.getState().clear(messageId)
+        }
+      })
       setPlaying(true)
     }
   }
@@ -108,6 +124,38 @@ const VoiceControls = ({ messageId, content, streaming }) => {
     setPlaying(false)
     setCurrentTime(0)
   }
+
+  // Handle playback errors: blob URLs created in a previous tab/process are
+  // invalid in this tab. Clear the stale entry so the next click generates
+  // fresh TTS with a direct URL instead of reusing the dead blob URL.
+  const onError = () => {
+    // audioUrl from render scope — still valid reference even if store updates
+    const url = audioUrl
+    if (url?.startsWith('blob:')) {
+      useTtsStore.getState().clear(messageId)
+    }
+  }
+
+  // Auto-play when audio becomes ready — the user clicked Listen, they shouldn't
+  // have to click play again after watching the spinner disappear.
+  useEffect(() => {
+    if (status === 'ready' && audioRef.current && audioUrl) {
+      // Guard against stale blob URL (restored from persist after a tab crash).
+      // If the audio element has no valid src, clear the entry and let the user
+      // click again to regenerate.
+      if (!audioRef.current.src || audioRef.current.src === window.location.href) {
+        useTtsStore.getState().clear(messageId)
+        return
+      }
+      audioRef.current.play().catch(err => {
+        // Playback failed — if it was a blob URL, discard it so the next click
+        // generates fresh TTS instead of retrying the same dead URL.
+        if (audioUrl?.startsWith('blob:')) {
+          useTtsStore.getState().clear(messageId)
+        }
+      })
+    }
+  }, [status, audioUrl, messageId])
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
@@ -190,6 +238,7 @@ const VoiceControls = ({ messageId, content, streaming }) => {
         onTimeUpdate={onTimeUpdate}
         onLoadedMetadata={onLoadedMetadata}
         onEnded={onEnded}
+        onError={onError}
       />
       <button
         onClick={toggle}
