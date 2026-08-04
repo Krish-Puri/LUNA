@@ -1,7 +1,8 @@
+import os
 import aiosqlite
 from pathlib import Path
 
-DATABASE_PATH = Path(__file__).parent.parent / "luna.db"
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).parent.parent / "luna.db"))
 
 
 async def get_db():

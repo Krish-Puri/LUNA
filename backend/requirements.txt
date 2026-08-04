@@ -3,5 +3,7 @@ uvicorn[standard]==0.30.0
 aiosqlite==0.20.0
 pydantic[email]==2.8.0
 python-multipart==0.0.9
-groq>=13.0.0
+groq>=1.0.0
 python-dotenv>=1.0.0
+piper-tts>=1.0.0
+onnxruntime>=1.19.0

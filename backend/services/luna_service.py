@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import Optional
 
 import aiosqlite
-from dotenv import find_dotenv
+from dotenv import load_dotenv
 
-# Find .env at project root
+# Load .env at project root into os.environ
 _dotenv_path = str(Path(__file__).parent.parent / ".env")
-find_dotenv(_dotenv_path)
+load_dotenv(_dotenv_path, override=True)
 
 DATABASE_PATH = Path(__file__).parent.parent / "luna.db"
 

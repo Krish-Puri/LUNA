@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -13,6 +15,9 @@ logging.basicConfig(level=logging.INFO, format="%(name)s — %(levelname)s — %
 from .routes import sessions, messages, users, health, chat, memory, tts
 from .database.init_db import init_database
 from .services import luna_service, tts_service
+
+# Load .env before reading CORS_ORIGINS so it can be set there
+load_dotenv(override=True)
 
 
 @asynccontextmanager
@@ -36,10 +41,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS — allow frontend dev server
+# CORS — origins from environment (default to localhost for local dev)
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,0 +1,7 @@
+luna.db
+storage/voice_notes/*
+storage/tts/*
+.env
+__pycache__/
+*.pyc
+.git
