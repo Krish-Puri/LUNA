@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "luna-backend"
+name = "luna"
 version = "0.1.0"
-description = "LUNA API backend"
+description = "LUNA mental wellness companion"
 python = "^3.11"
 
 [tool.poetry.dependencies]
