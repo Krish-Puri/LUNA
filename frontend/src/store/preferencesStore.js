@@ -43,7 +43,7 @@ const usePreferencesStore = create((set, get) => ({
     try {
       await preferencesApi.updatePreferences(userId, { [apiKey]: value })
     } catch (err) {
-      console.error('Failed to persist preference:', err)
+      // silently ignore — preference update failure shouldn't disrupt UX
     }
   },
 

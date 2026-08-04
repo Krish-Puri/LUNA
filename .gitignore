@@ -31,7 +31,8 @@ coverage/
 __pycache__/
 *.py[cod]
 *.db
-storage/
+storage/voice_notes/
+storage/tts/
 
 # Misc
 *.bak

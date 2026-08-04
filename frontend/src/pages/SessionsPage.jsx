@@ -8,6 +8,7 @@ import InputComposer from '../components/chat/InputComposer'
 import Grainient from '../components/ui/Grainient'
 import SettingsPanel from '../components/settings/SettingsPanel'
 import SessionMenuPanel from '../components/settings/SessionMenuPanel'
+import { API_BASE } from '../config'
 import useSessionStore from '../store/sessionStore'
 import useChatStore from '../store/chatStore'
 import useVoiceStore from '../store/voiceStore'
@@ -179,7 +180,6 @@ const SessionsPage = () => {
         // correct activeSessionId and doesn't call setActiveSession(null).
         setIsInitialized(true)
       } catch (err) {
-        console.error('Failed to initialize:', err)
         setIsInitialized(true)
       }
     }
@@ -285,7 +285,7 @@ const SessionsPage = () => {
         }),
       })
     } catch (err) {
-      console.error('Failed to store user message:', err)
+      // silently ignore — message is already displayed optimistically
     }
 
     // Start LUNA response stream
@@ -327,7 +327,6 @@ const SessionsPage = () => {
           if (!data) continue
 
           if (data.error) {
-            console.error('LUNA stream error:', data.error)
             break
           }
 
@@ -351,7 +350,6 @@ const SessionsPage = () => {
       }
     } catch (err) {
       if (err.name === 'AbortError') { setIsSending(false); return }  // stream was cancelled — normal
-      console.error('Stream error:', err)
       setTyping(false)
     }
     } finally {
@@ -398,7 +396,6 @@ const SessionsPage = () => {
     try {
       await messagesApi.updateMessage(editId, { content: newContent })
     } catch (err) {
-      console.error('Failed to update message:', err)
       setTyping(false)
       return
     }
@@ -440,7 +437,6 @@ const SessionsPage = () => {
           if (!data) continue
 
           if (data.error) {
-            console.error('LUNA stream error:', data.error)
             break
           }
 
@@ -461,7 +457,6 @@ const SessionsPage = () => {
       }
     } catch (err) {
       if (err.name === 'AbortError') return
-      console.error('Stream error:', err)
       setTyping(false)
     }
   }
@@ -497,7 +492,7 @@ const SessionsPage = () => {
         ...voiceMsg,
         id: sent.id,
         audioUrl: sent.voice_note?.file_path
-          ? `http://localhost:8000/storage/${sent.voice_note.file_path.replace(/\\/g, '/').replace(/^storage\//, '')}`
+          ? `${API_BASE}/storage/${sent.voice_note.file_path.replace(/\\/g, '/').replace(/^storage\//, '')}`
           : null,
         transcription: transcriptToSend,
         timestamp: new Date(sent.created_at).toLocaleTimeString('en-US', {
@@ -546,7 +541,6 @@ const SessionsPage = () => {
               if (!data) continue
 
               if (data.error) {
-                console.error('LUNA voice stream error:', data.error)
                 break
               }
 
@@ -563,12 +557,11 @@ const SessionsPage = () => {
             }
           }
         } catch (err) {
-          if (err.name !== 'AbortError') console.error('Voice stream error:', err)
           setTyping(false)
         }
       }
     } catch (err) {
-      console.error('Failed to send voice note:', err)
+      // voice note will remain in optimistic state — user can retry
     }
   }
 
@@ -615,7 +608,6 @@ const SessionsPage = () => {
   // Trigger summary generation for a session
   const handleGenerateSummary = async (sessionId) => {
     // TODO: wire to backend summary trigger endpoint when available
-    console.info('[SessionsPage] Generate summary requested for session:', sessionId)
   }
 
   // Handle voice recording result — called by VoiceMicButton after MediaRecorder stops
@@ -632,7 +624,6 @@ const SessionsPage = () => {
         )
         setTranscriptionResult(result.transcript || '')
       } catch (err) {
-        console.error('Transcription failed:', err)
         setTranscriptionError(err.message)
       }
     }

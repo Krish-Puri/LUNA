@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import * as messagesApi from '../api/messages'
+import { API_BASE } from '../config'
 
 const useChatStore = create((set, get) => ({
   messages: [],
@@ -95,7 +96,7 @@ const useChatStore = create((set, get) => ({
           messageType: m.message_type,
           transcription: voiceNote?.transcript || null,
           audioUrl: voiceNote?.file_path
-            ? `http://localhost:8000/storage/${voiceNote.file_path.replace(/\\/g, '/').replace(/^storage\//, '')}`
+            ? `${API_BASE}/storage/${voiceNote.file_path.replace(/\\/g, '/').replace(/^storage\//, '')}`
             : null,
           createdAt: new Date(m.created_at),
           timestamp: new Date(m.created_at).toLocaleTimeString('en-US', {

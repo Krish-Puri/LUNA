@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import useTtsStore from '../../store/ttsStore'
 import { generateTTS, checkTTSStatus } from '../../api/tts'
+import { API_BASE } from '../../config'
 
 const formatTime = (seconds) => {
   if (!Number.isFinite(seconds)) return '0:00'
@@ -76,7 +77,7 @@ const VoiceControls = ({ messageId, content, streaming }) => {
       const result = await generateTTS(msgId, text)
       if (result.status === 'ready') {
         // Audio already on disk — build full URL immediately
-        const fullUrl = `http://localhost:8000/storage/tts/${msgId}.wav`
+        const fullUrl = `${API_BASE}/storage/tts/${msgId}.wav`
         setReady(msgId, fullUrl)
       } else {
         // Background generation started — poll until ready

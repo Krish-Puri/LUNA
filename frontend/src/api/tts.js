@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 /**
  * Request TTS generation for a message.
@@ -8,7 +8,7 @@ const BASE_URL = 'http://localhost:8000'
  * @returns {Promise<{ status: 'ready'|'generating', audioUrl: string|null }>}
  */
 export async function generateTTS(messageId, content) {
-  const res = await fetch(`${BASE_URL}/api/tts`, {
+  const res = await fetch(`${API_BASE}/api/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message_id: messageId, content }),
@@ -24,7 +24,7 @@ export async function generateTTS(messageId, content) {
  * @returns {Promise<{ status: 'ready'|'generating', audioUrl: string|null }>}
  */
 export async function checkTTSStatus(messageId) {
-  const res = await fetch(`${BASE_URL}/api/tts/${messageId}`)
+  const res = await fetch(`${API_BASE}/api/tts/${messageId}`)
 
   // 404 or 202 both mean still generating
   if (res.status === 404 || res.status === 202) {
@@ -34,6 +34,6 @@ export async function checkTTSStatus(messageId) {
 
   // 200 OK — file is ready; serve it directly.
   // The browser handles range requests and streaming natively via the direct URL.
-  const audioUrl = `${BASE_URL}/api/tts/${messageId}`
+  const audioUrl = `${API_BASE}/api/tts/${messageId}`
   return { status: 'ready', audioUrl }
 }

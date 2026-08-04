@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 /**
  * Open a streaming SSE connection to the LUNA chat endpoint.
@@ -12,7 +12,7 @@ const BASE_URL = 'http://localhost:8000'
  */
 export async function streamChat(sessionId, content, messageId, signal) {
   const response = await fetch(
-    `${BASE_URL}/api/chat/session/${sessionId}/stream`,
+    `${API_BASE}/api/chat/session/${sessionId}/stream`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

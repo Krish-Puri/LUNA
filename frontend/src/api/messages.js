@@ -1,4 +1,5 @@
 import request from './client'
+import { API_BASE } from '../config'
 
 // Transcribe audio via Whisper — saves file and returns transcript without creating DB records
 export async function transcribeAudio(sessionId, audioBlob, language = 'en') {
@@ -6,7 +7,7 @@ export async function transcribeAudio(sessionId, audioBlob, language = 'en') {
   formData.append('file', audioBlob, 'voice.webm')
   formData.append('language', language)
 
-  const res = await fetch(`http://localhost:8000/api/messages/session/${sessionId}/transcribe`, {
+  const res = await fetch(`${API_BASE}/api/messages/session/${sessionId}/transcribe`, {
     method: 'POST',
     body: formData,
   })
@@ -51,7 +52,7 @@ export async function uploadVoiceNote(sessionId, audioBlob, durationSeconds, tra
     formData.append('transcript', transcript)
   }
 
-  const res = await fetch(`http://localhost:8000/api/messages/session/${sessionId}/voice`, {
+  const res = await fetch(`${API_BASE}/api/messages/session/${sessionId}/voice`, {
     method: 'POST',
     body: formData,
   })
