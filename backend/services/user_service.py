@@ -74,14 +74,17 @@ async def get_or_create_user(db: aiosqlite.Connection, client_id: str, name: str
     if row:
         return User(**dict(row))
 
-    # New browser — create user with the client-supplied ID (no email needed).
+    # New browser — create user with client-supplied ID.
+    # Use a derived email so the NOT NULL constraint is satisfied.
+    # Format: {first-8-chars-of-uuid}@luna.local (unique per browser, deterministic).
     now = datetime.utcnow().isoformat()
+    derived_email = f"{client_id[:8]}@luna.local"
     await db.execute(
         """
         INSERT INTO users (id, email, name, profile_picture, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (client_id, None, name, None, now, now)
+        (client_id, derived_email, name, None, now, now)
     )
     # Create default preferences.
     await db.execute(
