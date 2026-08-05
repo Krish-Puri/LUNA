@@ -3,10 +3,11 @@ Run this once to initialize the database and create all tables.
 Usage: python -m database.init_db
 """
 import asyncio
+import os
 import aiosqlite
 from pathlib import Path
 
-DATABASE_PATH = Path(__file__).parent.parent / "luna.db"
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).parent.parent / "luna.db"))
 
 SCHEMA = """
 -- =============================================
