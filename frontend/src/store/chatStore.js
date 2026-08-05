@@ -1,8 +1,11 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import * as messagesApi from '../api/messages'
 import { API_BASE } from '../config'
 
-const useChatStore = create((set, get) => ({
+const useChatStore = create(
+  persist(
+    (set, get) => ({
   messages: [],
   isTyping: false,
   isSending: false,
@@ -107,7 +110,13 @@ const useChatStore = create((set, get) => ({
       })
       set({ messages: [...mapped, ...optimisticMessages], isSending: false })
     } catch (err) {
-      set({ error: err.message, isSending: false })
+      // 404 = session was deleted server-side (e.g. Render ephemeral DB reset).
+      // Keep current messages so the UI stays usable; just clear the loading state.
+      const isNotFound = err.message?.includes('404') || err.message?.toLowerCase().includes('not found')
+      set({
+        error: isNotFound ? null : err.message,
+        isSending: false,
+      })
     }
   },
 
@@ -206,6 +215,15 @@ const useChatStore = create((set, get) => ({
 
   // Clear messages
   clearMessages: () => set({ messages: [], isTyping: false, error: null }),
-}))
+}),
+    {
+      name: 'luna-chat-v1',
+      // Only persist messages — skip streamingTokens, isTyping, isSending (transient).
+      partialize: (state) => ({
+        messages: state.messages,
+      }),
+    }
+  )
+)
 
 export default useChatStore

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import * as sessionsApi from '../api/sessions'
 
 function computeGroup(lastMessageAt, createdAt) {
@@ -32,7 +33,9 @@ function computeTime(lastMessageAt, createdAt) {
 
 const SESSION_STORAGE_KEY = 'luna_active_session'
 
-const useSessionStore = create((set, get) => ({
+const useSessionStore = create(
+  persist(
+    (set, get) => ({
   sessions: [],
   activeSessionId: null,
   isLoading: false,
@@ -90,13 +93,8 @@ const useSessionStore = create((set, get) => ({
     return sessions.find(s => s.id === activeSessionId) || null
   },
 
-  // Set active session — persists to localStorage so it survives reloads
+  // Set active session — zustand persist handles survival across reloads.
   setActiveSession: (sessionId) => {
-    if (sessionId) {
-      localStorage.setItem(SESSION_STORAGE_KEY, sessionId)
-    } else {
-      localStorage.removeItem(SESSION_STORAGE_KEY)
-    }
     set({ activeSessionId: sessionId })
   },
 
@@ -123,8 +121,6 @@ const useSessionStore = create((set, get) => ({
         sessions: [newSession, ...state.sessions],
         activeSessionId: session.id,
       }))
-      // Also persist to localStorage so reloads survive.
-      localStorage.setItem(SESSION_STORAGE_KEY, session.id)
       return newSession
     } catch (err) {
       set({ error: err.message })
@@ -245,6 +241,17 @@ const useSessionStore = create((set, get) => ({
       }),
     }))
   },
-}))
+}),
+    {
+      name: 'luna-sessions-v1',
+      // Only persist sessions list and activeSessionId — skip API calls and computed fields.
+      partialize: (state) => ({
+        sessions: state.sessions,
+        activeSessionId: state.activeSessionId,
+        userId: state.userId,
+      }),
+    }
+  )
+)
 
 export default useSessionStore
