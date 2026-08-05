@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import * as preferencesApi from '../api/preferences'
 
 const usePreferencesStore = create((set, get) => ({
-  theme: 'system',
+  theme: 'light',
   memoryEnabled: true,
   voiceEnabled: true,
   language: 'en',
@@ -13,7 +13,7 @@ const usePreferencesStore = create((set, get) => ({
     try {
       const prefs = await preferencesApi.getPreferences(userId)
       set({
-        theme: prefs.theme || 'system',
+        theme: prefs.theme || 'light',
         memoryEnabled: prefs.memory_enabled ?? true,
         voiceEnabled: prefs.voice_enabled ?? true,
         language: prefs.language || 'en',

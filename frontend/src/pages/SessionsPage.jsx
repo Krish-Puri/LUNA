@@ -168,7 +168,7 @@ const SessionsPage = () => {
   useEffect(() => {
     const init = async () => {
       // Apply dark mode class before first paint to avoid flash
-      const savedTheme = localStorage.getItem('luna_theme') || 'system'
+      const savedTheme = localStorage.getItem('luna_theme') || 'light'
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
       if (savedTheme === 'dark' || (savedTheme === 'system' && prefersDark)) {
         document.documentElement.classList.add('dark')
