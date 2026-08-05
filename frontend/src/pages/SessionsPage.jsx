@@ -8,6 +8,7 @@ import InputComposer from '../components/chat/InputComposer'
 import Grainient from '../components/ui/Grainient'
 import SettingsPanel from '../components/settings/SettingsPanel'
 import SessionMenuPanel from '../components/settings/SessionMenuPanel'
+import AboutLuna from '../components/ui/AboutLuna'
 import { API_BASE } from '../config'
 import useSessionStore from '../store/sessionStore'
 import useChatStore from '../store/chatStore'
@@ -674,6 +675,9 @@ const SessionsPage = () => {
 
       {/* Settings slide-in panel */}
       <SettingsPanel />
+
+      {/* About Luna slide-in panel */}
+      <AboutLuna />
 
       {/* Session menu slide-in panel */}
       <SessionMenuPanel

@@ -169,8 +169,9 @@ const SessionItem = ({ session, isActive, onClick, onRename, onDelete, onArchive
 // Settings area at bottom
 const SettingsArea = () => {
   const openSettings = useSettingsStore(s => s.openSettings)
+  const openAbout = useSettingsStore(s => s.openAbout)
   return (
-    <div className="p-3 border-t border-border">
+    <div className="p-3 border-t border-border space-y-1">
       <div
         onClick={openSettings}
         className="flex items-center gap-3 p-2 rounded-lg hover:bg-bg-tertiary cursor-pointer transition-colors"
@@ -186,6 +187,21 @@ const SettingsArea = () => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </IconButton>
+      </div>
+
+      <div
+        onClick={openAbout}
+        className="flex items-center gap-3 p-2 rounded-lg hover:bg-bg-tertiary cursor-pointer transition-colors"
+      >
+        <div className="w-6 h-6 rounded-full bg-bg-tertiary text-accent flex items-center justify-center flex-shrink-0">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-text-primary truncate">About Luna</p>
+          <p className="text-xs text-text-tertiary">Features & help</p>
+        </div>
       </div>
     </div>
   )
