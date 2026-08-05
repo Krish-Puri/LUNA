@@ -13,8 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app/backend/
 
 ENV PORT=8080
+ENV PIPER_MODEL=/app/backend/storage/piper_models/en_US-lessac-medium.onnx
 EXPOSE 8080
 
-# Run from /app/backend so that storage/, etc. relative paths resolve correctly.
-# Changing dir after WORKDIR is set does not persist across CMD shell form.
-CMD sh -c 'cd /app/backend && python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT'
+CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
