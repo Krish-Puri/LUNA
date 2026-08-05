@@ -37,3 +37,4 @@ storage/tts/
 # Misc
 *.bak
 *.tmp
+.claude/plans/
