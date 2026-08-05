@@ -634,9 +634,9 @@ const SessionsPage = () => {
 
   // Resolve grain settings: localStorage or sensible defaults
   const effectiveGrain = grainSettings || {
-    color1: '#ca6363',
-    color2: '#f5e6d3',
-    color3: '#b85c5c',
+    color1: '#6b86ef',
+    color2: '#cbf532',
+    color3: '#3ed08c',
     timeSpeed: 0.15,
     warpAmplitude: 40.0,
   }
