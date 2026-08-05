@@ -3,7 +3,7 @@ import asyncio
 import threading
 import logging
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,13 @@ PIPER_DIR = Path(__file__).parent.parent / "storage" / "piper_models"
 # Always use absolute path. The ENV var is overridden at runtime on Render,
 # so compute the absolute path from the file's location to guarantee correctness.
 PIPER_MODEL = str(PIPER_DIR / "en_US-lessac-medium.onnx")
-_executor = ThreadPoolExecutor(max_workers=2)
+
+# Use ProcessPoolExecutor (not ThreadPoolExecutor) so synthesis runs in a
+# separate process. On Render's 512MB free container, OS OOM killer can kill a
+# thread without proper exception propagation — a separate process surfaces
+# the failure as a return code instead of silently disappearing.
+# max_workers=1 because the semaphore already serializes synthesis.
+_executor = ProcessPoolExecutor(max_workers=1)
 
 # Serialize TTS synthesis — only one can run at a time. Running two Piper
 # synthesis passes simultaneously on a 512MB Render free container causes OOM.
@@ -77,7 +83,10 @@ def _run_piper(text: str, output_path: str) -> None:
     This prevents readers from ever seeing a half-written file.
     """
     import wave
+    import sys
     logger.info(f"[TTS-BACKEND] _run_piper — text length: {len(text)}, output: {output_path}")
+    sys.stdout.flush()   # flush immediately — process may be killed before normal flush
+    sys.stderr.flush()
     tmp_path = output_path + '.tmp'
     try:
         voice = _get_voice()  # reuse cached voice
@@ -86,6 +95,8 @@ def _run_piper(text: str, output_path: str) -> None:
         os.replace(tmp_path, output_path)  # atomic on POSIX; move on Windows
         file_size = os.path.getsize(output_path)
         logger.info(f"[TTS-BACKEND] _run_piper — synthesis complete, file size: {file_size}")
+        sys.stdout.flush()
+        sys.stderr.flush()
     except Exception:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
@@ -142,10 +153,28 @@ async def generate_tts(message_id: str, text: str) -> str:
         # Only one _run_piper runs at a time; others wait here.
         async with _synthesis_semaphore:
             loop = asyncio.get_event_loop()
-            await asyncio.wait_for(
-                loop.run_in_executor(_executor, _run_piper, text, output_path),
-                timeout=90
-            )
+            future = loop.run_in_executor(_executor, _run_piper, text, output_path)
+            try:
+                await asyncio.wait_for(future, timeout=120)
+            except asyncio.TimeoutError:
+                # Timeout — cancel the future and mark failed so frontend stops polling.
+                future.cancel()
+                set_generation_state(message_id, 'failed')
+                logger.error(f"[TTS-BACKEND] generate_tts — timed out after 120s, state: failed")
+                raise
+            except asyncio.CancelledError:
+                # The wait_for itself was cancelled (e.g. client disconnected or
+                # shutdown). The semaphore will be released by the context manager.
+                set_generation_state(message_id, 'failed')
+                logger.warning(f"[TTS-BACKEND] generate_tts — cancelled, state: failed")
+                raise
+            except (OSError, RuntimeError) as e:
+                # OS error: process was killed by OOM killer — worker process died
+                # without raising a Python exception, surfacing as a broken pipe / OS error.
+                # RuntimeError: ProcessPoolExecutor worker raised an unhandled exception.
+                set_generation_state(message_id, 'failed')
+                logger.error(f"[TTS-BACKEND] generate_tts — executor error (worker died?), state: failed: {e}")
+                raise
 
         file_size = os.path.getsize(output_path)
         if file_size == 0:
