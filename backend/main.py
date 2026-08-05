@@ -23,7 +23,9 @@ load_dotenv(override=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database and warm caches on startup."""
+    print("[STARTUP] Calling init_database()...")
     await init_database()
+    print("[STARTUP] init_database() complete.")
     # Warm the LUNA system prompt cache
     try:
         await luna_service.load_active_system_prompt()

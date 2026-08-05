@@ -17,6 +17,7 @@ async def get_db():
 
 async def get_db_connection():
     """Standalone connection for startup/shutdown tasks."""
+    print(f"[GET_DB] DATABASE_PATH = {DATABASE_PATH} (absolute: {DATABASE_PATH.is_absolute()})")
     db = await aiosqlite.connect(DATABASE_PATH)
     db.row_factory = aiosqlite.Row
     return db

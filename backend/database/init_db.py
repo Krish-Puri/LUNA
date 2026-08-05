@@ -168,11 +168,14 @@ CREATE INDEX IF NOT EXISTS idx_stats_user_date ON usage_stats(user_id, date DESC
 
 async def init_database():
     """Create all tables defined in SCHEMA."""
-    print(f"Initializing database at: {DATABASE_PATH}")
+    print(f"[INIT] DATABASE_PATH = {DATABASE_PATH} (absolute: {DATABASE_PATH.is_absolute()})")
+    print("[INIT] Starting database initialization...")
 
     async with aiosqlite.connect(DATABASE_PATH) as db:
         # Enable foreign keys
         await db.execute("PRAGMA foreign_keys = ON;")
+        result = await db.execute("PRAGMA database_list").fetchall()
+        print(f"[INIT] database_list: {result}")
 
         # Execute schema
         for statement in SCHEMA.strip().split(";"):
@@ -181,7 +184,7 @@ async def init_database():
                 await db.execute(statement)
 
         await db.commit()
-        print("All tables created successfully.")
+        print("[INIT] All tables created successfully.")
 
 
 if __name__ == "__main__":
