@@ -1,8 +1,8 @@
 import useSettingsStore from '../../store/settingsStore'
 
 const FeatureCard = ({ icon, title, description }) => (
-  <div className="flex items-start gap-3 p-3 rounded-lg bg-bg-secondary">
-    <div className="w-8 h-8 rounded-full bg-accent/10 text-accent flex items-center justify-center flex-shrink-0">
+  <div className="flex items-start gap-3 p-3 rounded-lg" style={{ background: 'rgba(193, 211, 199, 0.15)' }}>
+    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(138, 177, 255, 0.15)', color: '#8ab1ff' }}>
       {icon}
     </div>
     <div>
@@ -146,7 +146,7 @@ const AboutLuna = () => {
           </div>
 
           {/* Privacy */}
-          <div className="p-3 rounded-lg bg-bg-secondary">
+          <div className="p-3 rounded-lg" style={{ background: 'rgba(193, 211, 199, 0.15)' }}>
             <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">Privacy</h3>
             <p className="text-xs text-text-secondary leading-relaxed">
               Your conversations are stored locally in your browser and on our server. No data is shared with third parties. You can delete your account data at any time by clearing your browser data.
