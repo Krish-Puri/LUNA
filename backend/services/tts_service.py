@@ -9,7 +9,9 @@ logger = logging.getLogger(__name__)
 
 TTS_DIR = Path(__file__).parent.parent / "storage" / "tts"
 PIPER_DIR = Path(__file__).parent.parent / "storage" / "piper_models"
-PIPER_MODEL = os.getenv("PIPER_MODEL", str(PIPER_DIR / "en_US-lessac-medium.onnx"))
+# Always use absolute path. The ENV var is overridden at runtime on Render,
+# so compute the absolute path from the file's location to guarantee correctness.
+PIPER_MODEL = str(PIPER_DIR / "en_US-lessac-medium.onnx")
 _executor = ThreadPoolExecutor(max_workers=2)
 
 # Lazily-loaded Piper voice — loaded once and reused for all synthesis.
@@ -49,12 +51,7 @@ def _get_voice():
     """Load and cache the Piper voice (called from the thread pool)."""
     global _voice
     if _voice is None:
-        import os
         from piper.voice import PiperVoice
-        model_path = PIPER_MODEL
-        logger.info(f"[TTS-BACKEND] _get_voice — PIPER_MODEL={model_path!r}, CWD={os.getcwd()!r}")
-        logger.info(f"[TTS-BACKEND] _get_voice — model exists: {os.path.exists(model_path)}")
-        logger.info(f"[TTS-BACKEND] _get_voice — config exists: {os.path.exists(model_path + '.json')}")
         _voice = PiperVoice.load(PIPER_MODEL)
     return _voice
 
