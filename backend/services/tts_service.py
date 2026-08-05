@@ -14,6 +14,10 @@ PIPER_DIR = Path(__file__).parent.parent / "storage" / "piper_models"
 PIPER_MODEL = str(PIPER_DIR / "en_US-lessac-medium.onnx")
 _executor = ThreadPoolExecutor(max_workers=2)
 
+# Serialize TTS synthesis — only one can run at a time. Running two Piper
+# synthesis passes simultaneously on a 512MB Render free container causes OOM.
+_synthesis_semaphore = asyncio.Semaphore(1)
+
 # Lazily-loaded Piper voice — loaded once and reused for all synthesis.
 # This avoids the ~11s load cost on every synthesis call.
 _voice = None
@@ -134,11 +138,14 @@ async def generate_tts(message_id: str, text: str) -> str:
                     raise TimeoutError("TTS warmup timed out after 30s (background warmup still running)")
 
         output_path = str(get_tts_dir() / f"{message_id}.wav")
-        loop = asyncio.get_event_loop()
-        await asyncio.wait_for(
-            loop.run_in_executor(_executor, _run_piper, text, output_path),
-            timeout=90
-        )
+        # Serialize synthesis to prevent memory exhaustion on free-tier containers.
+        # Only one _run_piper runs at a time; others wait here.
+        async with _synthesis_semaphore:
+            loop = asyncio.get_event_loop()
+            await asyncio.wait_for(
+                loop.run_in_executor(_executor, _run_piper, text, output_path),
+                timeout=90
+            )
 
         file_size = os.path.getsize(output_path)
         if file_size == 0:

@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+import signal
+import sys
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -11,6 +13,21 @@ from pathlib import Path
 # Configure root logger so all `logging.getLogger(__name__)` calls output.
 # level=INFO ensures [SESSION-BACKEND], [TTS-BACKEND] etc. are visible.
 logging.basicConfig(level=logging.INFO, format="%(name)s — %(levelname)s — %(message)s")
+
+# Graceful SIGTERM handler — Render sends SIGTERM before killing the container.
+# Without this, the process dies silently and state is left stuck at 'generating'.
+def sigterm_handler(signum, frame):
+    logger = logging.getLogger("shutdown")
+    logger.warning("[SHUTDOWN] SIGTERM received — logging state before exit")
+    # Log active TTS generation states so we have a record of what was interrupted.
+    from .services.tts_service import get_generation_state, _state
+    for msg_id, state in _state.items():
+        logger.warning(f"[SHUTDOWN] TTS message_id={msg_id} state={state}")
+    sys.stdout.flush()
+    sys.stderr.flush()
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, sigterm_handler)
 
 from .routes import sessions, messages, users, health, chat, memory, tts
 from .database.init_db import init_database
