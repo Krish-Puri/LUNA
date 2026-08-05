@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 import aiosqlite
 from ..database.connection import get_db
 from ..models.user import User, UserCreate, UserUpdate
@@ -20,6 +21,25 @@ async def create_user(
         raise HTTPException(status_code=400, detail="Email already registered")
 
     return await user_service.create_user(db, user_data)
+
+
+class GetOrCreateRequest(BaseModel):
+    client_id: str
+    name: str = "Luna User"
+
+
+@router.post("/get-or-create", response_model=User)
+async def get_or_create_user(
+    request: GetOrCreateRequest,
+    db: aiosqlite.Connection = Depends(get_db)
+):
+    """Get an existing user by client_id or create a new one.
+
+    The client (browser) generates a UUID via crypto.randomUUID(), stores it in
+    localStorage, and sends it here on every visit. This way each browser gets
+    its own isolated account — no email required, no conflicts between users.
+    """
+    return await user_service.get_or_create_user(db, request.client_id, request.name)
 
 
 @router.get("/{user_id}", response_model=User)

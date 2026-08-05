@@ -59,6 +59,44 @@ async def get_user_by_email(db: aiosqlite.Connection, email: str) -> Optional[Us
     return None
 
 
+async def get_or_create_user(db: aiosqlite.Connection, client_id: str, name: str = "Luna User") -> User:
+    """Get an existing user by client_id (browser-generated UUID) or create a new one.
+
+    Each browser generates a UUID via crypto.randomUUID() and stores it in localStorage.
+    On return visit, we find that same user. On first visit for a fresh browser, we create
+    a new user tied to that browser's UUID — no email conflict, no server-side session.
+    """
+    cursor = await db.execute(
+        "SELECT * FROM users WHERE id = ? AND deleted_at IS NULL",
+        (client_id,)
+    )
+    row = await cursor.fetchone()
+    if row:
+        return User(**dict(row))
+
+    # New browser — create user with the client-supplied ID (no email needed).
+    now = datetime.utcnow().isoformat()
+    await db.execute(
+        """
+        INSERT INTO users (id, email, name, profile_picture, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (client_id, None, name, None, now, now)
+    )
+    # Create default preferences.
+    await db.execute(
+        """
+        INSERT INTO preferences (user_id, theme, voice_enabled, voice_model, language, memory_enabled, notifications, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (client_id, "light", True, "whisper-1", "en", True, True, now)
+    )
+    await db.commit()
+    cursor = await db.execute("SELECT * FROM users WHERE id = ?", (client_id,))
+    row = await cursor.fetchone()
+    return User(**dict(row))
+
+
 async def update_user(
     db: aiosqlite.Connection,
     user_id: str,

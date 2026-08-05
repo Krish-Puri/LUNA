@@ -17,18 +17,20 @@ import * as usersApi from '../api/users'
 import * as messagesApi from '../api/messages'
 import { streamChat, parseSSEData } from '../api/chat'
 
-// Ensure a default user exists, returns user id
+// Ensure a default user exists, returns user id.
+// Each browser generates its own UUID via crypto.randomUUID() and stores it in
+// localStorage. On first visit we POST to get-or-create (server generates no
+// email), on return visits we find the same user by that UUID.
 async function ensureUser() {
   let userId = localStorage.getItem('luna_user_id')
   if (!userId) {
-    const user = await usersApi.createUser({
-      email: 'default@luna.app',
-      name: 'Luna User',
-    })
-    userId = user.id
+    // Brand new browser — generate a UUID client-side, persist it, then
+    // register it with the backend so we can find it again on return visits.
+    userId = crypto.randomUUID()
     localStorage.setItem('luna_user_id', userId)
   }
-  return userId
+  const user = await usersApi.getOrCreateUser(userId)
+  return user.id
 }
 
 // Voice preview bar shown after recording — handles transcription display and editing
