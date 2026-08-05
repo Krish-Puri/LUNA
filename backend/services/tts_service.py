@@ -137,7 +137,7 @@ async def generate_tts(message_id: str, text: str) -> str:
         loop = asyncio.get_event_loop()
         await asyncio.wait_for(
             loop.run_in_executor(_executor, _run_piper, text, output_path),
-            timeout=30
+            timeout=90
         )
 
         file_size = os.path.getsize(output_path)

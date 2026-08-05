@@ -15,7 +15,7 @@ function formatTime(seconds) {
 // Confirmed UUID — temp prefixes never appear after finalizeStreamingMessage.
 const isTempId = (id) => /^luna-|^voice-|^user-/.test(id)
 
-const POLL_TIMEOUT_MS = 60_000   // Give synthesis up to 60s before declaring failed.
+const POLL_TIMEOUT_MS = 120_000   // Backend allows up to 90s synthesis; give polling a comfortable margin.
 const POLL_INTERVAL_MS = 500
 
 const VoiceControls = ({ messageId, content, streaming }) => {
