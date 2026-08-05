@@ -184,6 +184,13 @@ async def init_database():
                 await db.execute(statement)
 
         await db.commit()
+
+        # Verify tables exist
+        tables = await (await db.execute("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
+        print(f"[INIT] Tables after commit: {[t[0] for t in tables]}")
+        import os
+        file_size = os.path.getsize(DATABASE_PATH)
+        print(f"[INIT] DB file size: {file_size} bytes")
         print("[INIT] All tables created successfully.")
 
 
