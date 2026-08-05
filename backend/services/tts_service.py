@@ -102,24 +102,37 @@ async def generate_tts(message_id: str, text: str) -> str:
     set_generation_state(message_id, 'generating')
 
     try:
-        _warm_done.wait()  # wait for voice to be ready (blocks only on first call)
+        _warm_done.wait(timeout=30)  # wait up to 30s for voice to be ready
+        if not _warm_done.is_set():
+            raise TimeoutError("TTS voice warmup timed out after 30s")
 
         output_path = str(get_tts_dir() / f"{message_id}.wav")
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(_executor, _run_piper, text, output_path)
+        await asyncio.wait_for(
+            loop.run_in_executor(_executor, _run_piper, text, output_path),
+            timeout=30
+        )
 
         set_generation_state(message_id, 'ready')
         file_size = os.path.getsize(output_path)
         logger.info(f"[TTS-BACKEND] generate_tts — state: ready, file size: {file_size}")
         return f"storage/tts/{message_id}.wav"
+    except asyncio.TimeoutError as e:
+        set_generation_state(message_id, 'failed')
+        logger.error(f"[TTS-BACKEND] generate_tts — state: failed, timeout: {e}")
+        raise
     except Exception as e:
         set_generation_state(message_id, 'failed')
-        logger.error(f"[TTS-BACKEND] generate_tts — state: failed, error: {e}")
+        logger.error(f"[TTS-BACKEND] generate_tts — state: failed, error: {e}", exc_info=True)
         raise
 
 
 def warm_voice():
     """Pre-load the Piper voice model. Safe to call at startup (runs in ThreadPool)."""
-    _get_voice()
-    _warm_done.set()  # Signal that the voice is ready
-    logger.info(f"[TTS-BACKEND] warm_voice — model loaded, warm_done.set() called")
+    try:
+        _get_voice()
+        _warm_done.set()  # Signal that the voice is ready
+        logger.info(f"[TTS-BACKEND] warm_voice — model loaded, warm_done.set() called")
+    except Exception as e:
+        logger.error(f"[TTS-BACKEND] warm_voice — FAILED to load model: {e}", exc_info=True)
+        _warm_done.set()  # Unblock waiters so they get a proper error instead of hanging
