@@ -19,6 +19,25 @@ _executor = ThreadPoolExecutor(max_workers=2)
 _voice = None
 # Set to "done" (signaled) once warm_voice() has fully loaded the model.
 _warm_done = threading.Event()
+# Tracks whether warmup has ever been triggered (started or completed).
+_warmup_started = False
+_warmup_started_lock = threading.Lock()
+
+
+def _get_voice():
+    """Load and cache the Piper voice (called from the thread pool)."""
+    global _voice
+    if _voice is None:
+        from piper.voice import PiperVoice
+        _voice = PiperVoice.load(PIPER_MODEL)
+        logger.info(f"[TTS-BACKEND] _get_voice — model loaded, id={id(_voice)}")
+    return _voice
+
+
+def get_tts_dir() -> Path:
+    TTS_DIR.mkdir(parents=True, exist_ok=True)
+    return TTS_DIR
+
 
 # ---------------------------------------------------------------------------
 # Generation state — replaces path.exists() as the readiness signal.
@@ -36,29 +55,12 @@ def get_generation_state(message_id: str) -> str:
 def set_generation_state(message_id: str, state: str) -> None:
     with _state_lock:
         _state[message_id] = state
-        logger.info(f"[TTS-BACKEND] set_generation_state — {message_id}: {state}")
+        logger.info(f"[TTS-BACKEND] setGenerationState — {message_id}: {state}")
 
 
 def clear_generation_state(message_id: str) -> None:
     with _state_lock:
         _state.pop(message_id, None)
-
-
-# ---------------------------------------------------------------------------
-# Voice loading
-# ---------------------------------------------------------------------------
-def _get_voice():
-    """Load and cache the Piper voice (called from the thread pool)."""
-    global _voice
-    if _voice is None:
-        from piper.voice import PiperVoice
-        _voice = PiperVoice.load(PIPER_MODEL)
-    return _voice
-
-
-def get_tts_dir() -> Path:
-    TTS_DIR.mkdir(parents=True, exist_ok=True)
-    return TTS_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +73,7 @@ def _run_piper(text: str, output_path: str) -> None:
     This prevents readers from ever seeing a half-written file.
     """
     import wave
-    logger.info(f"[TTS-BACKEND] _run_piper — text length: {len(text)}")
+    logger.info(f"[TTS-BACKEND] _run_piper — text length: {len(text)}, output: {output_path}")
     tmp_path = output_path + '.tmp'
     try:
         voice = _get_voice()  # reuse cached voice
@@ -104,17 +106,32 @@ async def generate_tts(message_id: str, text: str) -> str:
     set_generation_state(message_id, 'generating')
 
     try:
-        # Wait for the model to finish loading (background warmup runs at startup).
-        # If warmup hasn't started or failed, trigger it lazily here and wait.
-        if not _warm_done.is_set():
-            logger.info("[TTS-BACKEND] warmup not yet complete, triggering lazy load...")
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(_executor, _get_voice)
-            _warm_done.set()
+        # Wait for the model to finish loading.
+        # Path A: warmup() ran at startup and completed — _warm_done is set, wait() returns immediately.
+        # Path B: warmup() is still running — wait() blocks until it finishes.
+        # Path C: warmup() never started (e.g., container cold-start before latest deploy) —
+        #          we detect _warmup_started is False and trigger lazy loading inline,
+        #          waiting for it to complete before proceeding.
+        if _warm_done.wait(timeout=30):
+            logger.info("[TTS-BACKEND] model already warm")
         else:
-            _warm_done.wait(timeout=30)  # wait up to 30s for voice to be ready
-            if not _warm_done.is_set():
-                raise TimeoutError("TTS voice warmup timed out after 30s")
+            # Timed out — warmup never started or is still running.
+            # Check _warmup_started to distinguish: if False, trigger lazy load; if True,
+            # the background warmup is still running and our wait will be satisfied by it.
+            with _warmup_started_lock:
+                started = _warmup_started
+            if not started:
+                logger.info("[TTS-BACKEND] warmup never triggered — lazy loading now...")
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(_executor, _get_voice)
+                _warm_done.set()
+                logger.info("[TTS-BACKEND] lazy load complete")
+            else:
+                # Background warmup is still running — wait for it.
+                logger.info("[TTS-BACKEND] warmup in progress, waiting...")
+                _warm_done.wait(timeout=30)
+                if not _warm_done.is_set():
+                    raise TimeoutError("TTS warmup timed out after 30s (background warmup still running)")
 
         output_path = str(get_tts_dir() / f"{message_id}.wav")
         loop = asyncio.get_event_loop()
@@ -123,8 +140,11 @@ async def generate_tts(message_id: str, text: str) -> str:
             timeout=30
         )
 
-        set_generation_state(message_id, 'ready')
         file_size = os.path.getsize(output_path)
+        if file_size == 0:
+            raise ValueError(f"TTS file is empty: {output_path}")
+
+        set_generation_state(message_id, 'ready')
         logger.info(f"[TTS-BACKEND] generate_tts — state: ready, file size: {file_size}")
         return f"storage/tts/{message_id}.wav"
     except asyncio.TimeoutError as e:
@@ -139,6 +159,10 @@ async def generate_tts(message_id: str, text: str) -> str:
 
 def warm_voice():
     """Pre-load the Piper voice model. Safe to call at startup (runs in ThreadPool)."""
+    global _warmup_started
+    with _warmup_started_lock:
+        _warmup_started = True
+
     try:
         _get_voice()
         _warm_done.set()  # Signal that the voice is ready

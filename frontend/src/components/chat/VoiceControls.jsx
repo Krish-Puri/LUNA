@@ -3,7 +3,9 @@ import useTtsStore from '../../store/ttsStore'
 import { generateTTS, checkTTSStatus } from '../../api/tts'
 import { API_BASE } from '../../config'
 
-const formatTime = (seconds) => {
+const log = (label, ...args) => console.log(`[VoiceControls ${new Date().toISOString()}] ${label}`, ...args)
+
+function formatTime(seconds) {
   if (!Number.isFinite(seconds)) return '0:00'
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
@@ -13,17 +15,20 @@ const formatTime = (seconds) => {
 // Confirmed UUID — temp prefixes never appear after finalizeStreamingMessage.
 const isTempId = (id) => /^luna-|^voice-|^user-/.test(id)
 
+const POLL_TIMEOUT_MS = 60_000   // Give synthesis up to 60s before declaring failed.
+const POLL_INTERVAL_MS = 500
+
 const VoiceControls = ({ messageId, content, streaming }) => {
   const audioRef = useRef(null)
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
-  // Track in-flight requests to prevent duplicate TTS calls
+  // Track in-flight requests to prevent duplicate TTS calls.
   const requestRef = useRef(null)
-  // Track active polling to prevent concurrent poll loops
+  // Track active polling to prevent concurrent poll loops.
   const pollRef = useRef(false)
 
-  // Read current TTS state from store — the single source of truth
+  // Read current TTS state from store — the single source of truth.
   const ttsEntry = useTtsStore(s => s.ttsState[messageId])
   const { setLoading, setReady, setError } = useTtsStore()
 
@@ -33,22 +38,51 @@ const VoiceControls = ({ messageId, content, streaming }) => {
 
   // --- Poll for audio readiness ---
   // Called after TTS request returns 'generating'. Keeps polling until the
-  // backend confirms the .wav file is ready. Guarded by pollRef to prevent
-  // concurrent poll loops if requestTTS is called multiple times.
+  // backend confirms the .wav file is ready or POLL_TIMEOUT_MS elapses.
+  // Guarded by pollRef to prevent concurrent poll loops.
   const pollForAudio = useCallback(async (msgId) => {
-    if (pollRef.current) return
+    if (pollRef.current) {
+      log('pollForAudio: already polling, skipping')
+      return
+    }
     pollRef.current = true
+    const pollStart = Date.now()
+    let consecutiveEmpty = 0
+
     try {
       while (true) {
-        const result = await checkTTSStatus(msgId)
-        if (result.status === 'ready') {
-          setReady(msgId, result.audioUrl)
-          break
+        const elapsed = Date.now() - pollStart
+        if (elapsed >= POLL_TIMEOUT_MS) {
+          log(`pollForAudio: TIMEOUT after ${elapsed}ms`)
+          setError(msgId, 'TTS generation timed out after 60s')
+          return
         }
-        // Still generating — wait before next poll
-        await new Promise(r => setTimeout(r, 500))
+
+        const result = await checkTTSStatus(msgId)
+        log(`pollForAudio: status=${result.status} elapsed=${elapsed}ms`)
+
+        if (result.status === 'ready') {
+          log(`pollForAudio: READY — setting URL`, result.audioUrl)
+          setReady(msgId, result.audioUrl)
+          return  // <-- explicitly return so fire-and-forget callers can't continue
+        }
+
+        if (result.status === 'failed') {
+          setError(msgId, 'TTS generation failed on backend')
+          return
+        }
+
+        // Still generating — wait before next poll.
+        // Count consecutive "still generating" to detect stalled state.
+        consecutiveEmpty += 1
+        if (consecutiveEmpty >= 10 && consecutiveEmpty % 10 === 0) {
+          log(`pollForAudio: still generating after ${elapsed}ms (${consecutiveEmpty} polls)`)
+        }
+
+        await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
       }
     } catch (err) {
+      log(`pollForAudio: error —`, err.message)
       setError(msgId, err.message)
     } finally {
       pollRef.current = false
@@ -56,62 +90,86 @@ const VoiceControls = ({ messageId, content, streaming }) => {
   }, [setReady, setError])
 
   // --- Request TTS generation ---
-  // Guards (in order):
-  //  1. Not finalized yet  — streaming, temp ID, or empty content → skip
-  //  2. Already loading    — duplicate request protection
-  //  3. Already ready      — audio already exists, nothing to do
-  //  4. Request in-flight — concurrent call protection via requestRef
+  // Guards (evaluated fresh from store on every call to avoid stale closure):
+  //  1. streaming or temp ID or empty content → skip entirely
+  //  2. 'loading' — TTS in progress, skip duplicate request
+  //  3. 'ready' — audio already exists, nothing to do
+  //  4. 'error' — clear previous error and retry fresh
+  //  5. request already in-flight via requestRef
   const requestTTS = useCallback(async (msgId, text) => {
+    // Read status fresh from store to avoid stale closure.
+    const currentStatus = useTtsStore.getState().ttsState[msgId]?.status || 'idle'
+    log(`requestTTS: status=${currentStatus} ref=${!!requestRef.current}`)
+
     if (streaming || isTempId(msgId) || !text || !text.trim()) {
+      log('requestTTS: skipped — streaming/temp/empty')
       return
     }
-    if (status === 'loading' || status === 'ready') {
+
+    // Allow retry on 'error' state by clearing it first.
+    if (currentStatus === 'error') {
+      log('requestTTS: clearing previous error and retrying')
+      useTtsStore.getState().clear(msgId)
+    }
+
+    if (currentStatus === 'loading' || currentStatus === 'ready') {
+      log(`requestTTS: skipped — status=${currentStatus}`)
       return
     }
+
     if (requestRef.current) {
+      log('requestTTS: request already in-flight')
       return
     }
+
     requestRef.current = true
     try {
       setLoading(msgId)
+      log(`requestTTS: POST /api/tts for ${msgId}`)
       const result = await generateTTS(msgId, text)
+      log(`requestTTS: response status=${result.status}`)
+
       if (result.status === 'ready') {
-        // Audio already on disk — build full URL immediately
+        // Audio already on disk.
         const fullUrl = `${API_BASE}/storage/tts/${msgId}.wav`
+        log(`requestTTS: already ready, URL=${fullUrl}`)
         setReady(msgId, fullUrl)
       } else {
-        // Background generation started — poll until ready
+        // Background generation started — poll until ready.
+        log(`requestTTS: generating, starting poll`)
         pollForAudio(msgId)
       }
     } catch (err) {
+      log(`requestTTS: catch —`, err.message)
       setError(msgId, err.message)
     } finally {
       requestRef.current = null
     }
-  }, [streaming, status, setLoading, setReady, setError, pollForAudio])
+  }, [streaming, setLoading, setReady, setError, pollForAudio])
 
   // --- Playback controls ---
-  const toggle = () => {
+  const toggle = useCallback(() => {
     const audio = audioRef.current
-    // Defensive: guard against null audioRef or null/missing src even if audioUrl
-    // is set in store — a stale blob URL (restored by persist on reload) would
-    // otherwise cause "no supported sources" because the tab that created the
-    // blob is gone.
-    if (!audio || !audioUrl || !audio.src) return
+    if (!audio) return
+    log(`toggle: playing=${playing} src=${!!audio.src}`)
+
     if (playing) {
       audio.pause()
       setPlaying(false)
     } else {
-      audio.play().catch(err => {
-        // If playback fails (stale blob, CORS, decode error), clear the entry
-        // so the next click generates fresh TTS instead of hitting the same bad URL.
+      if (!audioUrl) return
+      audio.play().then(() => {
+        log('toggle: play() succeeded')
+        setPlaying(true)
+      }).catch(err => {
+        log('toggle: play() failed', err.message)
         if (audioUrl?.startsWith('blob:')) {
           useTtsStore.getState().clear(messageId)
         }
+        setPlaying(false)
       })
-      setPlaying(true)
     }
-  }
+  }, [playing, audioUrl, messageId])
 
   const onTimeUpdate = () => {
     if (audioRef.current) setCurrentTime(audioRef.current.currentTime)
@@ -126,42 +184,41 @@ const VoiceControls = ({ messageId, content, streaming }) => {
     setCurrentTime(0)
   }
 
-  // Handle playback errors: blob URLs created in a previous tab/process are
-  // invalid in this tab. Clear the stale entry so the next click generates
-  // fresh TTS with a direct URL instead of reusing the dead blob URL.
   const onError = () => {
-    // audioUrl from render scope — still valid reference even if store updates
     const url = audioUrl
+    log(`onError: url=${url} playing=${playing}`)
     if (url?.startsWith('blob:')) {
       useTtsStore.getState().clear(messageId)
     }
+    setPlaying(false)
   }
 
-  // Auto-play when audio becomes ready — the user clicked Listen, they shouldn't
-  // have to click play again after watching the spinner disappear.
+  // Auto-play when audio becomes ready.
+  // The user clicked "Listen to Luna" — they shouldn't have to click again.
   useEffect(() => {
-    if (status === 'ready' && audioRef.current && audioUrl) {
-      // Guard against stale blob URL (restored from persist after a tab crash).
-      // If the audio element has no valid src, clear the entry and let the user
-      // click again to regenerate.
-      if (!audioRef.current.src || audioRef.current.src === window.location.href) {
-        useTtsStore.getState().clear(messageId)
-        return
-      }
-      audioRef.current.play().catch(err => {
-        // Playback failed — if it was a blob URL, discard it so the next click
-        // generates fresh TTS instead of retrying the same dead URL.
-        if (audioUrl?.startsWith('blob:')) {
-          useTtsStore.getState().clear(messageId)
-        }
-      })
+    if (status !== 'ready' || !audioUrl) return
+    const audio = audioRef.current
+    if (!audio || !audio.src || audio.src === window.location.href) {
+      log('autoPlay: no src, clearing')
+      useTtsStore.getState().clear(messageId)
+      return
     }
+    log('autoPlay: playing')
+    audio.play().then(() => {
+      log('autoPlay: play() succeeded')
+      setPlaying(true)
+    }).catch(err => {
+      log('autoPlay: play() failed', err.message)
+      if (audioUrl?.startsWith('blob:')) {
+        useTtsStore.getState().clear(messageId)
+      }
+      setPlaying(false)
+    })
   }, [status, audioUrl, messageId])
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
   // Guard: refuse to operate on anything that isn't a finalized assistant message.
-  // This is the architectural guarantee — TTS must NEVER see partial/streaming content.
   const isFinalized = !streaming && !isTempId(messageId) && content && content.trim()
 
   // --- Idle: show Listen button (disabled while Luna is typing or message not ready) ---
@@ -247,11 +304,11 @@ const VoiceControls = ({ messageId, content, streaming }) => {
       >
         {playing ? (
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
           </svg>
         ) : (
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
+            <path d="M8 5v14l11-7z"/>
           </svg>
         )}
       </button>
