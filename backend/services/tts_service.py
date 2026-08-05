@@ -104,9 +104,17 @@ async def generate_tts(message_id: str, text: str) -> str:
     set_generation_state(message_id, 'generating')
 
     try:
-        _warm_done.wait(timeout=30)  # wait up to 30s for voice to be ready
+        # Wait for the model to finish loading (background warmup runs at startup).
+        # If warmup hasn't started or failed, trigger it lazily here and wait.
         if not _warm_done.is_set():
-            raise TimeoutError("TTS voice warmup timed out after 30s")
+            logger.info("[TTS-BACKEND] warmup not yet complete, triggering lazy load...")
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(_executor, _get_voice)
+            _warm_done.set()
+        else:
+            _warm_done.wait(timeout=30)  # wait up to 30s for voice to be ready
+            if not _warm_done.is_set():
+                raise TimeoutError("TTS voice warmup timed out after 30s")
 
         output_path = str(get_tts_dir() / f"{message_id}.wav")
         loop = asyncio.get_event_loop()
