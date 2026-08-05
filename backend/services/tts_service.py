@@ -49,7 +49,12 @@ def _get_voice():
     """Load and cache the Piper voice (called from the thread pool)."""
     global _voice
     if _voice is None:
+        import os
         from piper.voice import PiperVoice
+        model_path = PIPER_MODEL
+        logger.info(f"[TTS-BACKEND] _get_voice — PIPER_MODEL={model_path!r}, CWD={os.getcwd()!r}")
+        logger.info(f"[TTS-BACKEND] _get_voice — model exists: {os.path.exists(model_path)}")
+        logger.info(f"[TTS-BACKEND] _get_voice — config exists: {os.path.exists(model_path + '.json')}")
         _voice = PiperVoice.load(PIPER_MODEL)
     return _voice
 
