@@ -78,7 +78,7 @@ async def get_or_create_user(db: aiosqlite.Connection, client_id: str, name: str
     # Use a derived email so the NOT NULL constraint is satisfied.
     # Format: {first-8-chars-of-uuid}@luna.local (unique per browser, deterministic).
     now = datetime.utcnow().isoformat()
-    derived_email = f"{client_id[:8]}@luna.local"
+    derived_email = f"{client_id[:8]}@luna.app"
     await db.execute(
         """
         INSERT INTO users (id, email, name, profile_picture, created_at, updated_at)
