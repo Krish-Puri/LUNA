@@ -174,7 +174,7 @@ async def init_database():
     async with aiosqlite.connect(DATABASE_PATH) as db:
         # Enable foreign keys
         await db.execute("PRAGMA foreign_keys = ON;")
-        result = await db.execute("PRAGMA database_list").fetchall()
+        result = await (await db.execute("PRAGMA database_list")).fetchall()
         print(f"[INIT] database_list: {result}")
 
         # Execute schema
