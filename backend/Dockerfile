@@ -15,6 +15,6 @@ COPY . /app/backend/
 ENV PORT=8080
 EXPOSE 8080
 
-# Run from /app where files are copied directly. main:app loads main.py as the
-# "app" attribute. An __init__.py makes /app a package so relative imports work.
-CMD python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+# Run from /app/backend so that storage/, etc. relative paths resolve correctly.
+# Changing dir after WORKDIR is set does not persist across CMD shell form.
+CMD sh -c 'cd /app/backend && python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT'
