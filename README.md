@@ -2,7 +2,7 @@
 
 Luna is a personal AI mental wellness companion with real-time streaming chat, voice notes, text-to-speech, and session management — all wrapped in a calming, customizable interface.
 
-**Live app:** `https://your-vercel-frontend.vercel.app`
+**Live app:** `https://luna-nine-virid.vercel.app`
 
 ---
 
@@ -125,7 +125,7 @@ Frontend at `http://localhost:5173` proxies API requests to `http://localhost:80
 4. Set **Build Command** to `npm run build`
 5. Set **Output Directory** to `dist`
 6. Add environment variable:
-   - `VITE_API_URL` = `https://your-backend-host.onrender.com` (your Render URL)
+   - `VITE_API_URL` = `https://your-backend-host.onrender.com` (your Render backend URL)
 7. Deploy
 
 > **Note:** After deploying the backend, update the `VITE_API_URL` in Vercel to match your actual backend URL and redeploy.
@@ -137,7 +137,7 @@ Frontend at `http://localhost:5173` proxies API requests to `http://localhost:80
 3. Set **Runtime** to `Docker`
 4. Add environment variables:
    - `GROQ_API_KEY` = your Groq API key
-   - `CORS_ORIGINS` = `https://your-vercel-frontend.vercel.app,http://localhost:5173`
+   - `CORS_ORIGINS` = `https://luna-nine-virid.vercel.app,http://localhost:5173`
    - `PORT` = `8080` (set automatically by Render)
 5. Deploy
 
@@ -148,7 +148,7 @@ Frontend at `http://localhost:5173` proxies API requests to `http://localhost:80
 After your Vercel frontend deploys, copy the Vercel URL and add it to Render's `CORS_ORIGINS` environment variable:
 
 ```
-https://your-vercel-frontend.vercel.app,http://localhost:5173
+https://luna-nine-virid.vercel.app,http://localhost:5173
 ```
 
 Render auto-redeploys when you save the environment variable.
