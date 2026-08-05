@@ -79,3 +79,19 @@ async def root():
         "version": "0.1.0",
         "status": "running"
     }
+
+
+@app.get("/debug/env")
+async def debug_env():
+    """Debug endpoint to check environment variables."""
+    import os
+    from pathlib import Path
+    storage_path = Path(__file__).parent / "storage" / "piper_models"
+    return {
+        "PIPER_MODEL": os.getenv("PIPER_MODEL"),
+        "PIPER_MODEL_default_resolved": str(storage_path / "en_US-lessac-medium.onnx"),
+        "CWD": os.getcwd(),
+        "storage_piper_exists": (storage_path / "en_US-lessac-medium.onnx").exists(),
+        "storage_piper_json_exists": (storage_path / "en_US-lessac-medium.onnx.json").exists(),
+        "files_in_piper_dir": list(storage_path.iterdir()) if storage_path.exists() else [],
+    }
