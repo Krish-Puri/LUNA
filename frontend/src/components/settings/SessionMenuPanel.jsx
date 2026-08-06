@@ -148,10 +148,19 @@ const SessionMenuPanel = ({
         onClick={closeSessionMenu}
       />
 
-      {/* Panel */}
-      <div className="fixed right-0 top-0 h-full w-80 z-50 flex flex-col
-                      bg-surface border-l border-border shadow-lg
-                      animate-slide-in">
+      {/* Panel — bottom sheet on mobile, right-side drawer on desktop */}
+      <div className={`
+        fixed z-50 flex flex-col bg-surface shadow-lg
+        animate-slide-up lg:animate-slide-in
+        /* Mobile: bottom sheet */
+        bottom-0 left-0 right-0 top-auto w-full max-h-[85vh] rounded-t-2xl
+        /* Desktop: right-side floating panel */
+        lg:bottom-auto lg:left-auto lg:right-0 lg:top-0 lg:w-80 lg:max-h-full lg:rounded-none lg:rounded-l-xl
+      `}>
+        {/* Drag handle — mobile only */}
+        <div className="flex justify-center pt-3 pb-2 lg:hidden">
+          <div className="w-9 h-1 bg-border rounded-full" />
+        </div>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">

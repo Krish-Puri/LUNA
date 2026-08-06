@@ -50,7 +50,10 @@ const VoicePreviewBar = ({
   const isError = transcriptionStatus === 'error'
 
   return (
-    <div className="border-t border-white/20 bg-white/40 backdrop-blur-md px-4 py-3">
+    <div
+      className="border-t border-white/20 bg-white/40 backdrop-blur-md px-3 lg:px-4 py-3"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <div className="max-w-3xl mx-auto flex flex-col gap-3">
         {/* Audio row */}
         <div className="flex items-center gap-2 overflow-x-auto">

@@ -223,6 +223,16 @@ const Sidebar = ({
 }) => {
   const navigate = useNavigate()
 
+  // Close sidebar on Escape key — important for mobile accessibility
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
   // Separate active (non-archived) from archived sessions
   const activeSessions = sessions.filter(s => !s.isArchived)
   const archivedSessions = sessions.filter(s => s.isArchived)

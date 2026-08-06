@@ -34,7 +34,10 @@ const Header = ({ title, subtitle, sessionTitle, showBackButton = false, onBack,
   }
 
   return (
-    <header className="h-16 px-4 flex items-center border-b border-white/20 bg-white/40 backdrop-blur-md">
+    <header
+      className="h-16 px-4 flex items-center border-b border-white/20 bg-white/40 backdrop-blur-md"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
       {/* Hamburger — mobile only (hidden at lg+) */}
       <button
         type="button"

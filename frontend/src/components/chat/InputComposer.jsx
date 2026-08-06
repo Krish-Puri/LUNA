@@ -72,6 +72,7 @@ const InputComposer = ({
     <form
       onSubmit={handleSubmit}
       className="border-t border-white/20 bg-white/40 backdrop-blur-md px-3 lg:px-4 py-4 shadow-sm"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {/* Edit mode header */}
       {editingMessage && (
