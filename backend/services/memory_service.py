@@ -14,21 +14,23 @@ from . import groq_service
 
 DATABASE_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).parent.parent / "luna.db"))
 
-EXTRACTION_PROMPT = """You are a memory extraction assistant for a mental health chatbot.
+EXTRACTION_PROMPT = """You are a memory extraction assistant for an AI companion chatbot named LUNA.
 
-Given a conversation between LUNA (an empathetic AI therapist) and a user, extract any notable facts, preferences, goals, or emotional patterns that LUNA should remember for future conversations.
+Given a conversation between LUNA and a user, extract any notable facts, preferences, goals, or emotional patterns that LUNA should remember for future conversations.
 
-Extract ONLY information that is:
-- Specific and personally relevant (not generic advice)
-- Emotionally or therapeutically significant
+Extract information that is:
+- Specific and personally relevant to this user (not generic advice)
+- Emotionally or therapeutically significant OR simply useful to know (e.g. name, gender, occupation, relationships, hobbies, life events)
 - Likely to be useful in future conversations
+
+IMPORTANT: Always extract the user's name if they share it, along with any other basic identity facts (gender, age, location, job, family, hobbies, etc.). These are high-value memories even if not "therapeutically significant."
 
 Return a JSON array with 0 to 5 objects. Each object has:
 - "type": one of "fact", "preference", "goal", "pattern"
 - "content": a concise description (under 30 words)
 - "confidence": a number between 0.5 and 1.0 indicating how confident you are this is real and useful
 
-Return an empty array [] if nothing notable was discussed.
+Return an empty array [] only if nothing worth remembering was discussed.
 
 Conversation:
 {conversation}
