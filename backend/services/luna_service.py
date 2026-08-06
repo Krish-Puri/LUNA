@@ -363,6 +363,7 @@ async def build_luna_messages(
     conversation_history: list[dict],
     user_content: str,
     user_id: str | None = None,
+    memory_enabled: bool = True,
 ) -> list[dict]:
     """
     Assemble the full messages list for Groq:
@@ -370,13 +371,13 @@ async def build_luna_messages(
       ...conversation_history (role+content pairs)...,
       {role: "user", content: <user_content>} ]
 
-    If user_id is provided, relevant memories are fetched and injected into the
-    system prompt as a "### Relevant Memory" block.
+    If user_id is provided and memory_enabled is True, relevant memories are fetched
+    and injected into the system prompt as a "### Relevant Memory" block.
     """
     system_prompt_text = await load_active_system_prompt()
 
-    # Inject memory context if user_id is available
-    if user_id:
+    # Inject memory context only if memory is enabled
+    if user_id and memory_enabled:
         try:
             from . import memory_service
             db = await aiosqlite.connect(DATABASE_PATH)

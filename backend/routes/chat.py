@@ -128,8 +128,22 @@ async def event_generator(
     # Fetch conversation context from DB (excludes soft-deleted messages)
     history = await message_service.get_conversation_context(db, session_id, limit=20)
 
-    # Build full messages list for Groq (with memory context if user_id available)
-    luna_messages = await luna_service.build_luna_messages(history, user_content, user_id)
+    # Check memory_enabled preference before building messages
+    memory_enabled = True
+    if user_id:
+        try:
+            cursor = await db.execute(
+                "SELECT memory_enabled FROM preferences WHERE user_id = ?",
+                (user_id,)
+            )
+            row = await cursor.fetchone()
+            if row:
+                memory_enabled = bool(row["memory_enabled"])
+        except Exception:
+            memory_enabled = True  # default to enabled on error
+
+    # Build full messages list for Groq (with memory context if enabled)
+    luna_messages = await luna_service.build_luna_messages(history, user_content, user_id, memory_enabled)
 
     # Pre-create the assistant message with a known UUID so the frontend can
     # replace its streaming placeholder by ID when the done event arrives
