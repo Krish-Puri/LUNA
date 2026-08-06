@@ -211,6 +211,8 @@ const SettingsArea = () => {
 const Sidebar = ({
   sessions = [],
   activeSessionId,
+  isOpen = true,
+  onClose,
   onSessionSelect,
   onNewSession,
   onRename,
@@ -220,10 +222,6 @@ const Sidebar = ({
   onTogglePin,
 }) => {
   const navigate = useNavigate()
-
-  // [DIAGNOSTIC] Stage 4 — trace where the active session disappears
-  useEffect(() => {
-  }, [sessions, activeSessionId])
 
   // Separate active (non-archived) from archived sessions
   const activeSessions = sessions.filter(s => !s.isArchived)
@@ -239,10 +237,12 @@ const Sidebar = ({
   const handleSessionClick = (sessionId) => {
     navigate(`/session/${sessionId}`)
     if (onSessionSelect) onSessionSelect(sessionId)
+    if (onClose) onClose()
   }
 
   const handleNewSession = () => {
     if (onNewSession) onNewSession()
+    if (onClose) onClose()
   }
 
   const renderSessionItem = (session) => (
@@ -260,65 +260,74 @@ const Sidebar = ({
   )
 
   return (
-    <aside className="w-[280px] h-full bg-white/40 backdrop-blur-md border-r border-white/20 flex flex-col">
-      {/* Logo */}
-      <LunaLogo />
+    <aside
+      className={`
+        h-full flex flex-col bg-white/40 backdrop-blur-md border-r border-white/20
+        transition-[width] duration-200 ease-in-out overflow-hidden
+        ${isOpen ? 'w-[280px]' : 'w-0'}
+      `}
+    >
+      {/* Sidebar content — always rendered, desktop visibility handled by parent wrapper */}
+      <div className="flex flex-col h-full min-w-[280px]">
+        {/* Logo */}
+        <LunaLogo />
 
-      {/* New Session Button */}
-      <NewSessionButton onClick={handleNewSession} />
+        {/* New Session Button */}
+        <NewSessionButton onClick={handleNewSession} />
 
-      {/* Divider */}
-      <div className="border-t border-border mx-3 my-2" />
+        {/* Divider */}
+        <div className="border-t border-border mx-3 my-2" />
 
-      {/* Session List */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Today */}
-        {groupedSessions.today.length > 0 && (
-          <div className="mb-3">
-            <SessionGroupHeader title="Today" count={groupedSessions.today.length} />
-            {groupedSessions.today.map(renderSessionItem)}
-          </div>
-        )}
+        {/* Session List */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Today */}
+          {groupedSessions.today.length > 0 && (
+            <div className="mb-3">
+              <SessionGroupHeader title="Today" count={groupedSessions.today.length} />
+              {groupedSessions.today.map(renderSessionItem)}
+            </div>
+          )}
 
-        {/* Yesterday */}
-        {groupedSessions.yesterday.length > 0 && (
-          <div className="mb-3">
-            <SessionGroupHeader title="Yesterday" count={groupedSessions.yesterday.length} />
-            {groupedSessions.yesterday.map(renderSessionItem)}
-          </div>
-        )}
+          {/* Yesterday */}
+          {groupedSessions.yesterday.length > 0 && (
+            <div className="mb-3">
+              <SessionGroupHeader title="Yesterday" count={groupedSessions.yesterday.length} />
+              {groupedSessions.yesterday.map(renderSessionItem)}
+            </div>
+          )}
 
-        {/* Earlier */}
-        {groupedSessions.earlier.length > 0 && (
-          <div className="mb-3">
-            <SessionGroupHeader title="Earlier" count={groupedSessions.earlier.length} />
-            {groupedSessions.earlier.map(renderSessionItem)}
-          </div>
-        )}
+          {/* Earlier */}
+          {groupedSessions.earlier.length > 0 && (
+            <div className="mb-3">
+              <SessionGroupHeader title="Earlier" count={groupedSessions.earlier.length} />
+              {groupedSessions.earlier.map(renderSessionItem)}
+            </div>
+          )}
 
-        {/* Archived sessions */}
-        {archivedSessions.length > 0 && (
-          <div className="mb-3">
-            <SessionGroupHeader title="Archived" count={archivedSessions.length} />
-            {archivedSessions.map(renderSessionItem)}
-          </div>
-        )}
+          {/* Archived sessions */}
+          {archivedSessions.length > 0 && (
+            <div className="mb-3">
+              <SessionGroupHeader title="Archived" count={archivedSessions.length} />
+              {archivedSessions.map(renderSessionItem)}
+            </div>
+          )}
 
-        {/* Empty state hint */}
-        {sessions.length === 0 && (
-          <div className="px-4 py-8 text-center">
-            <p className="text-sm text-text-tertiary">
-              No conversations yet
-            </p>
-            <p className="text-xs text-text-tertiary mt-1">
-              Start a new session to begin
-            </p>
-          </div>
-        )}
+          {/* Empty state hint */}
+          {sessions.length === 0 && (
+            <div className="px-4 py-8 text-center">
+              <p className="text-sm text-text-tertiary">
+                No conversations yet
+              </p>
+              <p className="text-xs text-text-tertiary mt-1">
+                Start a new session to begin
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Settings */}
+        <SettingsArea />
       </div>
-
-      {/* Settings */}
-      <SettingsArea />
     </aside>
   )
 }

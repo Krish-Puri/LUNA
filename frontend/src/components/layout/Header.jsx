@@ -9,7 +9,7 @@ const getGreeting = () => {
   return 'Good evening'
 }
 
-const Header = ({ title, subtitle, sessionTitle, showBackButton = false, onBack, onRename }) => {
+const Header = ({ title, subtitle, sessionTitle, showBackButton = false, onBack, onRename, onMenuToggle }) => {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(title || '')
   const inputRef = useRef(null)
@@ -35,6 +35,18 @@ const Header = ({ title, subtitle, sessionTitle, showBackButton = false, onBack,
 
   return (
     <header className="h-16 px-4 flex items-center border-b border-white/20 bg-white/40 backdrop-blur-md">
+      {/* Hamburger — mobile only (hidden at lg+) */}
+      <button
+        type="button"
+        onClick={onMenuToggle}
+        className="mr-3 p-1.5 -ml-1.5 rounded-lg hover:bg-bg-secondary transition-colors lg:hidden"
+        aria-label="Toggle sidebar"
+      >
+        <svg className="w-5 h-5 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
       {/* Back button (mobile/sidebar context) */}
       {showBackButton && (
         <IconButton

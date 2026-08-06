@@ -14,6 +14,7 @@ import useSessionStore from '../store/sessionStore'
 import useChatStore from '../store/chatStore'
 import useVoiceStore from '../store/voiceStore'
 import usePreferencesStore from '../store/preferencesStore'
+import useSettingsStore from '../store/settingsStore'
 import * as usersApi from '../api/users'
 import * as messagesApi from '../api/messages'
 import { streamChat, parseSSEData } from '../api/chat'
@@ -120,6 +121,13 @@ const SessionsPage = () => {
     unarchiveSession,
     togglePin,
   } = useSessionStore()
+
+  const {
+    isSidebarOpen,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSettingsStore()
 
   const {
     messages,
@@ -693,18 +701,38 @@ const SessionsPage = () => {
 
       {/* UI layer — above the gradient */}
       <div className="relative z-10 flex h-full w-full">
-      {/* Left Sidebar */}
-      <Sidebar
-        sessions={sessions}
-        activeSessionId={activeSessionId || sessionId}
-        onSessionSelect={setActiveSession}
-        onNewSession={handleNewSession}
-        onRename={handleRename}
-        onDelete={handleDelete}
-        onArchive={archiveSession}
-        onUnarchive={unarchiveSession}
-        onTogglePin={togglePin}
-      />
+
+      {/* Mobile sidebar backdrop — covers screen when mobile sidebar is open */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Left Sidebar — off-canvas on mobile, hidden on desktop when closed */}
+      <div className={`
+        fixed lg:relative inset-y-0 left-0 z-40
+        transition-transform duration-200 ease-in-out
+        ${isSidebarOpen
+          ? 'translate-x-0'
+          : '-translate-x-full lg:translate-x-0 lg:hidden'}
+      `}>
+        <Sidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId || sessionId}
+          isOpen={isSidebarOpen}
+          onClose={closeSidebar}
+          onSessionSelect={setActiveSession}
+          onNewSession={handleNewSession}
+          onRename={handleRename}
+          onDelete={handleDelete}
+          onArchive={archiveSession}
+          onUnarchive={unarchiveSession}
+          onTogglePin={togglePin}
+        />
+      </div>
 
       {/* Main Content Area */}
       <MainContent>
@@ -714,6 +742,7 @@ const SessionsPage = () => {
           sessionTitle={activeSession?.title || null}
           subtitle={activeSession?.time || ''}
           onRename={handleRenameFromHeader}
+          onMenuToggle={toggleSidebar}
         />
 
         {/* Chat Area */}
