@@ -17,6 +17,7 @@ import usePreferencesStore from '../store/preferencesStore'
 import useSettingsStore from '../store/settingsStore'
 import useMemoryStore from '../store/memoryStore'
 import * as usersApi from '../api/users'
+import * as sessionsApi from '../api/sessions'
 import * as messagesApi from '../api/messages'
 import * as memoryApi from '../api/memory'
 import { streamChat, parseSSEData } from '../api/chat'
@@ -173,6 +174,7 @@ const SessionsPage = () => {
   const [isInitialized, setIsInitialized] = useState(false)
   const [editingMessage, setEditingMessage] = useState(null)  // message being edited
   const [isSending, setIsSending] = useState(false)  // guard against concurrent handleSendMessage calls
+  const [summaryState, setSummaryState] = useState({ status: 'idle', summary: null })  // summary modal state
   const [grainSettings, setGrainSettings] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('luna_grainient_settings') || 'null')
@@ -638,7 +640,18 @@ const SessionsPage = () => {
 
   // Trigger summary generation for a session
   const handleGenerateSummary = async (sessionId) => {
-    // TODO: wire to backend summary trigger endpoint when available
+    setSummaryState({ status: 'generating', summary: null })
+    try {
+      const result = await sessionsApi.generateSummary(sessionId)
+      setSummaryState({ status: 'done', summary: result.summary || '' })
+    } catch (err) {
+      setSummaryState({ status: 'error', summary: null })
+      console.error('Summary generation failed:', err)
+    }
+  }
+
+  const handleCloseSummary = () => {
+    setSummaryState({ status: 'idle', summary: null })
   }
 
   // Handle voice recording result — called by VoiceMicButton after MediaRecorder stops
@@ -717,6 +730,8 @@ const SessionsPage = () => {
         onDelete={handleDelete}
         onClear={handleClearConversation}
         onExport={() => {}} // placeholder
+        summaryState={summaryState}
+        onCloseSummary={handleCloseSummary}
       />
 
       {/* UI layer — above the gradient */}

@@ -23,3 +23,9 @@ export async function updateSession(sessionId, data = {}) {
     body: JSON.stringify(data),
   })
 }
+
+export async function generateSummary(sessionId) {
+  return request(`/api/sessions/${encodeURIComponent(sessionId)}/summary`, {
+    method: 'POST',
+  })
+}
