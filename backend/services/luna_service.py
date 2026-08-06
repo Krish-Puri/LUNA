@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 _dotenv_path = str(Path(__file__).parent.parent / ".env")
 load_dotenv(_dotenv_path, override=True)
 
-DATABASE_PATH = Path(__file__).parent.parent / "luna.db"
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).parent.parent / "luna.db"))
 
 # Module-level cache for the active system prompt
 _cached_prompt: Optional[str] = None

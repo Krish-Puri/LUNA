@@ -2,6 +2,7 @@
 Memory service — extracts notable facts/preferences/goals from conversations,
 stores them in the memory table, and retrieves relevant memories for context injection.
 """
+import os
 import aiosqlite
 import uuid
 import json
@@ -11,7 +12,7 @@ from pathlib import Path
 
 from . import groq_service
 
-DATABASE_PATH = Path(__file__).parent.parent / "luna.db"
+DATABASE_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).parent.parent / "luna.db"))
 
 EXTRACTION_PROMPT = """You are a memory extraction assistant for a mental health chatbot.
 
