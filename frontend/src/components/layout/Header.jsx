@@ -38,11 +38,11 @@ const Header = ({ title, subtitle, sessionTitle, showBackButton = false, onBack,
       className="h-16 px-4 flex items-center border-b border-white/20 bg-white/40 backdrop-blur-md"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      {/* Hamburger — mobile only (hidden at lg+) */}
+      {/* Hamburger — toggle sidebar at any screen width */}
       <button
         type="button"
         onClick={onMenuToggle}
-        className="mr-3 p-1.5 -ml-1.5 rounded-lg hover:bg-bg-secondary transition-colors lg:hidden"
+        className="mr-3 p-1.5 -ml-1.5 rounded-lg hover:bg-bg-secondary transition-colors"
         aria-label="Toggle sidebar"
       >
         <svg className="w-5 h-5 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">

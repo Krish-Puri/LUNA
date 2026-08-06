@@ -714,13 +714,13 @@ const SessionsPage = () => {
         />
       )}
 
-      {/* Left Sidebar — off-canvas on mobile, hidden on desktop when closed */}
+      {/* Left Sidebar — off-canvas on mobile, slides away on desktop when closed (stays in DOM so toggle can reopen it) */}
       <div className={`
         fixed lg:relative inset-y-0 left-0 z-40
         transition-transform duration-200 ease-in-out
         ${isSidebarOpen
           ? 'translate-x-0'
-          : '-translate-x-full lg:translate-x-0 lg:hidden'}
+          : '-translate-x-full'}
       `}>
         <Sidebar
           sessions={sessions}
