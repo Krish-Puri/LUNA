@@ -53,7 +53,6 @@ async def groq_stream_async(messages: list[dict], model: str):
 # Memory extraction — runs as fire-and-forget after each LUNA response
 # ------------------------------------------------------------------
 async def _extract_memories(
-    db: aiosqlite.Connection,
     session_id: str,
     user_id: str | None,
     user_message: str,
@@ -62,10 +61,14 @@ async def _extract_memories(
 ) -> None:
     """
     Check memory_enabled preference, then extract and save memories.
+    Opens its own DB connection — does NOT reuse the SSE stream's connection.
     Safe to fire-and-forget — all errors are swallowed.
     """
     if not user_id:
         return
+
+    # Open a fresh connection — never reuse the caller's connection
+    db = await get_db_connection()
     try:
         cursor = await db.execute(
             "SELECT memory_enabled FROM preferences WHERE user_id = ?",
@@ -75,6 +78,7 @@ async def _extract_memories(
         if not row or not row["memory_enabled"]:
             return
     except Exception:
+        await db.close()
         return
 
     try:
@@ -84,6 +88,8 @@ async def _extract_memories(
         )
     except Exception as e:
         print(f"[_extract_memories] failed: {e}")
+    finally:
+        await db.close()
 
 
 # ------------------------------------------------------------------
@@ -188,7 +194,7 @@ async def event_generator(
 
         # Trigger async memory extraction (fire-and-forget)
         asyncio.create_task(
-            _extract_memories(db, session_id, user_id, user_content, full_text, assistant_msg_id)
+            _extract_memories(session_id, user_id, user_content, full_text, assistant_msg_id)
         )
 
     except Exception as e:
