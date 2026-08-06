@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Mic } from 'lucide-react'
 import useVoiceStore from '../../store/voiceStore'
+import usePreferencesStore from '../../store/preferencesStore'
 
 export default function VoiceMicButton({ onStop, disabled = false }) {
   const [isRecording, setIsRecording] = useState(false)
@@ -19,6 +20,7 @@ export default function VoiceMicButton({ onStop, disabled = false }) {
   const startTimeRef = useRef(null)
 
   const { startRecording: storeStartRecording } = useVoiceStore()
+  const voiceEnabled = usePreferencesStore(s => s.voiceEnabled)
 
   // Timer tick
   useEffect(() => {
@@ -83,7 +85,7 @@ export default function VoiceMicButton({ onStop, disabled = false }) {
   }, [])
 
   const handleClick = () => {
-    if (disabled) return
+    if (disabled || !voiceEnabled) return
     isRecording ? stopCapture() : startCapture()
   }
 
@@ -110,11 +112,11 @@ export default function VoiceMicButton({ onStop, disabled = false }) {
       <button
         type="button"
         onClick={handleClick}
-        disabled={disabled}
+        disabled={disabled || !voiceEnabled}
         aria-label={isRecording ? 'Stop recording' : 'Start recording'}
         className={`
           flex items-center justify-center rounded-xl transition-colors duration-200
-          ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-bg-tertiary cursor-pointer'}
+          ${disabled || !voiceEnabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-bg-tertiary cursor-pointer'}
           ${isRecording ? 'bg-accent-light w-11 h-11 min-w-11' : 'bg-transparent w-11 h-11 min-w-11'}
         `}
       >
