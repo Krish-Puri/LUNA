@@ -4,7 +4,7 @@ import logging
 from typing import List
 from ..database.connection import get_db
 from ..models.session import Session, SessionCreate, SessionUpdate, SessionWithPreview
-from ..services import session_service
+from ..services import session_service, summary_service, message_service
 
 logger = logging.getLogger(__name__)
 
@@ -142,3 +142,39 @@ async def delete_session(
     if not success:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"success": True, "message": "Session deleted"}
+
+
+@router.post("/{session_id}/summary")
+async def generate_session_summary(
+    session_id: str,
+    db: aiosqlite.Connection = Depends(get_db)
+):
+    """
+    Generate a conversation summary on demand for the given session.
+    Returns the summary text. Saves it to session_summaries table.
+    """
+    # Verify session exists
+    session = await session_service.get_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Fetch conversation messages (last 10, oldest first for context)
+    messages = await message_service.get_messages_by_session(db, session_id, limit=10)
+    msg_dicts = [
+        {"role": m.role, "content": m.content}
+        for m in reversed(messages)
+        if m.role in ("user", "assistant") and m.content
+    ]
+
+    if not msg_dicts:
+        raise HTTPException(status_code=400, detail="No messages to summarize")
+
+    # Generate summary via Groq
+    summary_text = await summary_service.generate_summary_text(msg_dicts)
+    if not summary_text:
+        raise HTTPException(status_code=500, detail="Summary generation failed")
+
+    # Persist it
+    await summary_service.save_summary(db, session_id, summary_text, len(msg_dicts))
+
+    return {"summary": summary_text}

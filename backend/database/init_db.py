@@ -185,6 +185,20 @@ async def _migrate_memory_table(db: aiosqlite.Connection) -> None:
         print("[INIT] Added last_used_at to memory table")
 
 
+async def _migrate_session_summaries_table(db: aiosqlite.Connection) -> None:
+    """
+    Add deleted_at column to session_summaries if it doesn't exist.
+    The summary_service queries use WHERE deleted_at IS NULL, but the column
+    was never in the original schema. Safe to call on every startup.
+    """
+    cursor = await db.execute("PRAGMA table_info(session_summaries)")
+    existing_cols = {row[1] for row in await cursor.fetchall()}
+
+    if "deleted_at" not in existing_cols:
+        await db.execute("ALTER TABLE session_summaries ADD COLUMN deleted_at TEXT")
+        print("[INIT] Added deleted_at to session_summaries table")
+
+
 async def init_database():
     """Create all tables defined in SCHEMA."""
     print(f"[INIT] DATABASE_PATH = {DATABASE_PATH} (absolute: {DATABASE_PATH.is_absolute()})")
@@ -206,6 +220,7 @@ async def init_database():
 
         # Run any post-schema migrations
         await _migrate_memory_table(db)
+        await _migrate_session_summaries_table(db)
 
         # Verify tables exist
         tables = await (await db.execute("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
