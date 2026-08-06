@@ -185,6 +185,13 @@ const SessionsPage = () => {
   // AbortController for cancelling in-flight SSE streams on session change
   const streamControllerRef = useRef(null)
 
+  // Auto-dismiss error toast after 4 seconds
+  useEffect(() => {
+    if (summaryState.status !== 'error') return
+    const timer = setTimeout(() => handleCloseSummary(), 4000)
+    return () => clearTimeout(timer)
+  }, [summaryState.status])
+
   // Initialize on mount: ensure user + load sessions + load preferences
   useEffect(() => {
     const init = async () => {
@@ -731,9 +738,14 @@ const SessionsPage = () => {
         onDelete={handleDelete}
         onClear={handleClearConversation}
         onExport={() => {}} // placeholder
-        summaryState={summaryState}
-        onCloseSummary={handleCloseSummary}
       />
+
+      {/* Summary error toast — shown briefly when generation fails */}
+      {summaryState.status === 'error' && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] bg-red-500 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+          Summary generation failed. Please try again.
+        </div>
+      )}
 
       {/* Summary modal — shown for both 'generating' (with spinner) and 'done' (with content) */}
       {(summaryState.status === 'generating' || summaryState.status === 'done') && (
