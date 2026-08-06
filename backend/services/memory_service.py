@@ -247,7 +247,6 @@ def format_memories_for_context(memories: list[dict]) -> str:
     for m in memories:
         tag = m["type"]  # fact, preference, goal, pattern
         content = m["content"]
-        conf = m.get("confidence", 1.0)
-        lines.append(f"- [{tag}] {content} (confidence: {conf:.0%})")
+        lines.append(f"- [{tag}] {content}")
 
     return "\n".join(lines)
