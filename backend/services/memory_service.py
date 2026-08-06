@@ -65,6 +65,8 @@ async def save_memories(
     conversation = f"User: {user_message}\n\nLUNA: {luna_response}"
     prompt = EXTRACTION_PROMPT.format(conversation=conversation)
 
+    print(f"[save_memories] user_id={user_id}, user_msg='{user_message[:80]}', luna_resp='{luna_response[:80]}'")
+
     try:
         client = groq_service.get_client()
         model = groq_service.get_model()
@@ -75,6 +77,7 @@ async def save_memories(
             max_tokens=300,
         )
         text = (response.choices[0].message.content or "").strip()
+        print(f"[save_memories] raw response: {text[:200]}")
 
         # Try to parse JSON array from the response
         # Handle cases where the model wraps the JSON in markdown backticks
@@ -214,9 +217,10 @@ async def get_memories_for_context(
     ]
 
     if not memories:
+        print(f"[get_memories_for_context] user_id={user_id}, query='{query_text[:80]}', no memories found")
         return []
 
-    # Try semantic reranking with Groq
+    print(f"[get_memories_for_context] user_id={user_id}, query='{query_text[:80]}', found {len(memories)} memories: {[m['content'][:50] for m in memories]}")
     try:
         reranked = await _semantic_rerank(db, memories, query_text)
     except Exception as e:

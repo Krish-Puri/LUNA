@@ -385,9 +385,11 @@ async def build_luna_messages(
             memories = await memory_service.get_memories_for_context(db, user_id, user_content, limit=5)
             await db.close()
             memory_block = memory_service.format_memories_for_context(memories)
+            print(f"[build_luna_messages] user_id={user_id}, memory_enabled={memory_enabled}, retrieved {len(memories)} memories, block='{memory_block[:200]}'")
             if memory_block:
                 system_prompt_text = system_prompt_text.rstrip() + "\n\n" + memory_block
-        except Exception:
+        except Exception as e:
+            print(f"[build_luna_messages] memory injection failed: {e}")
             pass  # memory injection is best-effort
 
     messages = [{"role": "system", "content": system_prompt_text}]
