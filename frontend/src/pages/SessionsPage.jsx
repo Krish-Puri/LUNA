@@ -53,18 +53,18 @@ const VoicePreviewBar = ({
     <div className="border-t border-white/20 bg-white/40 backdrop-blur-md px-4 py-3">
       <div className="max-w-3xl mx-auto flex flex-col gap-3">
         {/* Audio row */}
-        <div className="flex items-center gap-3">
-          <audio src={audioUrl} controls className="flex-1 h-8" />
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <audio src={audioUrl} controls className="flex-1 h-8 min-w-0" />
           <button
             onClick={onDiscard}
-            className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+            className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors flex-shrink-0"
           >
             Discard
           </button>
           <button
             onClick={onSend}
             disabled={isLoading}
-            className="px-4 py-1.5 bg-accent text-text-inverse text-sm rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-1.5 bg-accent text-text-inverse text-sm rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
           >
             Send
           </button>

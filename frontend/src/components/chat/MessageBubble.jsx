@@ -82,7 +82,7 @@ const MessageBubble = ({ message, showAvatar = true, onEdit }) => {
   const isVoice = message.messageType === 'voice'
 
   return (
-    <div className={`flex gap-3 px-4 group ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div className={`flex gap-3 px-3 lg:px-4 group ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
       {/* Avatar */}
       <div className="flex-shrink-0 w-8">
         {showAvatar && (
@@ -95,7 +95,7 @@ const MessageBubble = ({ message, showAvatar = true, onEdit }) => {
       </div>
 
       {/* Message content */}
-      <div className={`flex flex-col max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex flex-col max-w-[75%] lg:max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
         {/* Bubble — voice uses neutral treatment, no user/LUNA color split */}
         <div
           className={`

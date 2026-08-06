@@ -38,7 +38,7 @@ const ChatArea = ({ messages = [], isTyping = false, onEdit }) => {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto py-6">
+    <div className="flex-1 overflow-y-auto py-6 px-3 lg:px-4">
       <div className="max-w-3xl mx-auto space-y-4">
         {messages.map((message, index) => (
           <MessageBubble

@@ -71,7 +71,7 @@ const InputComposer = ({
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-t border-white/20 bg-white/40 backdrop-blur-md px-4 py-4 shadow-sm"
+      className="border-t border-white/20 bg-white/40 backdrop-blur-md px-3 lg:px-4 py-4 shadow-sm"
     >
       {/* Edit mode header */}
       {editingMessage && (
@@ -88,9 +88,9 @@ const InputComposer = ({
           </button>
         </div>
       )}
-      <div className="max-w-3xl mx-auto flex items-center gap-2">
+      <div className="max-w-3xl mx-auto flex items-end gap-2">
         {/* Text input */}
-        <div className="flex-1 relative">
+        <div className="flex-1 min-w-0">
           <textarea
             ref={textareaRef}
             value={inputValue}

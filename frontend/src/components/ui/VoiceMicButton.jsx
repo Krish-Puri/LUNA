@@ -115,7 +115,7 @@ export default function VoiceMicButton({ onStop, disabled = false }) {
         className={`
           flex items-center justify-center rounded-xl transition-colors duration-200
           ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-bg-tertiary cursor-pointer'}
-          ${isRecording ? 'bg-accent-light w-12 h-12' : 'bg-transparent w-10 h-10'}
+          ${isRecording ? 'bg-accent-light w-11 h-11 min-w-11' : 'bg-transparent w-11 h-11 min-w-11'}
         `}
       >
         {isRecording ? (
