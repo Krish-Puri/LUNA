@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import useSettingsStore from '../../store/settingsStore'
 import usePreferencesStore from '../../store/preferencesStore'
+import * as memoryApi from '../../api/memory'
 
 // Toggle switch
 const Toggle = ({ checked, onChange }) => (
@@ -231,6 +232,15 @@ const SettingsPanel = () => {
                 onChange={(v) => updatePreference(userId, 'memoryEnabled', v)}
               />
             </div>
+            <button
+              onClick={async () => {
+                if (!window.confirm('Delete all saved memories? This cannot be undone.')) return
+                await memoryApi.deleteAllMemories(userId)
+              }}
+              className="mt-3 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 rounded-lg transition-colors text-left"
+            >
+              Delete all memories
+            </button>
           </Section>
 
           {/* Voice */}

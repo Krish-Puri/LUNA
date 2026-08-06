@@ -109,6 +109,7 @@ const useChatStore = create(
         }
       })
       set({ messages: [...mapped, ...optimisticMessages], isSending: false })
+      return msgs
     } catch (err) {
       // 404 = session was deleted server-side (e.g. Render ephemeral DB reset).
       // Keep current messages so the UI stays usable; just clear the loading state.
@@ -117,6 +118,7 @@ const useChatStore = create(
         error: isNotFound ? null : err.message,
         isSending: false,
       })
+      throw err
     }
   },
 

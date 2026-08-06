@@ -167,6 +167,24 @@ CREATE INDEX IF NOT EXISTS idx_stats_user_date ON usage_stats(user_id, date DESC
 """
 
 
+async def _migrate_memory_table(db: aiosqlite.Connection) -> None:
+    """
+    Add times_referenced and last_used_at columns to the memory table
+    only if they do not already exist. Safe to call on every startup.
+    """
+    # Check existing columns
+    cursor = await db.execute("PRAGMA table_info(memory)")
+    existing_cols = {row[1] for row in await cursor.fetchall()}
+
+    if "times_referenced" not in existing_cols:
+        await db.execute("ALTER TABLE memory ADD COLUMN times_referenced INTEGER NOT NULL DEFAULT 0")
+        print("[INIT] Added times_referenced to memory table")
+
+    if "last_used_at" not in existing_cols:
+        await db.execute("ALTER TABLE memory ADD COLUMN last_used_at TEXT")
+        print("[INIT] Added last_used_at to memory table")
+
+
 async def init_database():
     """Create all tables defined in SCHEMA."""
     print(f"[INIT] DATABASE_PATH = {DATABASE_PATH} (absolute: {DATABASE_PATH.is_absolute()})")
@@ -185,6 +203,9 @@ async def init_database():
                 await db.execute(statement)
 
         await db.commit()
+
+        # Run any post-schema migrations
+        await _migrate_memory_table(db)
 
         # Verify tables exist
         tables = await (await db.execute("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()

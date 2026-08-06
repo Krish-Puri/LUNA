@@ -15,8 +15,10 @@ import useChatStore from '../store/chatStore'
 import useVoiceStore from '../store/voiceStore'
 import usePreferencesStore from '../store/preferencesStore'
 import useSettingsStore from '../store/settingsStore'
+import useMemoryStore from '../store/memoryStore'
 import * as usersApi from '../api/users'
 import * as messagesApi from '../api/messages'
+import * as memoryApi from '../api/memory'
 import { streamChat, parseSSEData } from '../api/chat'
 
 // Ensure a default user exists, returns user id.
@@ -162,6 +164,11 @@ const SessionsPage = () => {
     setEditedTranscript,
   } = useVoiceStore()
 
+  const {
+    setSessionMemories,
+    clearSessionMemories,
+  } = useMemoryStore()
+
   // Local state
   const [isInitialized, setIsInitialized] = useState(false)
   const [editingMessage, setEditingMessage] = useState(null)  // message being edited
@@ -225,14 +232,24 @@ const SessionsPage = () => {
         const stillExists = sessions.some(s => s.id === sessionId)
         if (!stillExists) {
           clearMessages()
+          clearSessionMemories()
           return
         }
       }
-      loadMessages(currentId)
+      loadMessages(currentId).then(() => {
+        memoryApi.getSessionContext(currentId).then((context) => {
+          setSessionMemories(context)
+        }).catch(() => {
+          // Memory context is non-critical — leave previous session's memories in place
+        })
+      }).catch(() => {
+        // loadMessages already handles its own error state
+      })
     } else {
       clearMessages()
+      clearSessionMemories()
     }
-  }, [activeSessionId, sessionId, isInitialized, loadMessages, clearMessages])
+  }, [activeSessionId, sessionId, isInitialized, loadMessages, clearMessages, clearSessionMemories, setSessionMemories])
 
   // Handle new session creation
   const handleNewSession = async () => {

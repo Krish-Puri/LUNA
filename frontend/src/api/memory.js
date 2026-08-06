@@ -11,3 +11,6 @@ export const getMemories = (userId, query = '', limit = 5) =>
 
 export const deleteMemory = (memoryId) =>
   request(`/api/memory/${memoryId}`, { method: 'DELETE' })
+
+export const getSessionContext = (sessionId) =>
+  request(`/api/memory/session/${encodeURIComponent(sessionId)}/context`)

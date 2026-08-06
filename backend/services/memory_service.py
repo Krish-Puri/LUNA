@@ -35,6 +35,20 @@ Conversation:
 JSON:
 """
 
+RERANK_PROMPT = """You are a memory reranking assistant for a mental health chatbot.
+
+Given a user's query and a list of memories, select the 5-7 most relevant memories that would help LUNA provide better, more personalized support.
+
+Query: {query}
+
+Memories:
+{memories}
+
+Return a JSON array containing only the IDs of the selected memories, in order of relevance (most relevant first). Return 5-7 memory IDs.
+
+JSON:
+"""
+
 
 async def save_memories(
     db: aiosqlite.Connection,
@@ -111,6 +125,69 @@ async def save_memories(
     return saved
 
 
+async def update_memory_usage(db: aiosqlite.Connection, memory_ids: list[str]) -> None:
+    """
+    Bump times_referenced and update last_used_at for the given memory IDs.
+    """
+    if not memory_ids:
+        return
+
+    now = datetime.utcnow().isoformat()
+    placeholders = ",".join(["?"] * len(memory_ids))
+    await db.execute(
+        f"""UPDATE memory
+            SET times_referenced = times_referenced + 1,
+                last_used_at = ?
+            WHERE id IN ({placeholders})""",
+        [now] + memory_ids
+    )
+    await db.commit()
+
+
+async def _semantic_rerank(
+    db: aiosqlite.Connection,
+    memories: list[dict],
+    query_text: str,
+) -> list[dict]:
+    """
+    Use Groq to semantically rerank memories against the query and return the top 5-7.
+    Returns the reranked list, or raises an exception on failure.
+    """
+    memories_text = "\n".join(
+        [f'ID: {m["id"]} | [{m["type"]}] {m["content"]} (confidence: {m["confidence"]})' for m in memories]
+    )
+    prompt = RERANK_PROMPT.format(query=query_text, memories=memories_text)
+
+    client = groq_service.get_client()
+    model = groq_service.get_model()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        max_tokens=200,
+    )
+    text = (response.choices[0].message.content or "").strip()
+
+    json_match = re.search(r'\[[\s\S]*\]', text)
+    if not json_match:
+        raise ValueError("No JSON array found in rerank response")
+
+    selected_ids = json.loads(json_match.group())
+    if not selected_ids:
+        raise ValueError("Empty rerank result")
+
+    # Build a lookup map
+    memory_map = {m["id"]: m for m in memories}
+
+    # Return in rerank order, max 7
+    result = []
+    for mem_id in selected_ids[:7]:
+        if mem_id in memory_map:
+            result.append(memory_map[mem_id])
+
+    return result
+
+
 async def get_memories_for_context(
     db: aiosqlite.Connection,
     user_id: str,
@@ -119,46 +196,44 @@ async def get_memories_for_context(
 ) -> list[dict]:
     """
     Retrieve memories relevant to a user's query text.
-    Uses simple keyword matching: words in query are matched against memory content.
-    Returns memories sorted by confidence descending.
+    Fetches top 15 by confidence, then uses Groq to semantically rerank and
+    select the best 5-7 memories. Falls back to top 5 by confidence if reranking fails.
+    Updates usage stats for returned memories.
     """
-    # Extract keywords (remove stopwords)
-    stopwords = {"the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-                 "have", "has", "had", "do", "does", "did", "will", "would", "could",
-                 "should", "may", "might", "must", "can", "to", "of", "in", "for",
-                 "on", "with", "at", "by", "from", "as", "that", "this", "it", "its",
-                 "i", "me", "my", "you", "your", "we", "our", "they", "them", "their",
-                 "what", "which", "who", "how", "when", "where", "why", "and", "or",
-                 "but", "so", "if", "then", "just", "about", "really", "like", "get", "got"}
-    words = [w.lower() for w in re.findall(r'\b\w+\b', query_text) if w.lower() not in stopwords and len(w) > 2]
-
-    if not words:
-        # Fall back to returning most recent memories
-        cursor = await db.execute(
-            """SELECT id, type, content, confidence FROM memory
-               WHERE user_id = ? AND deleted_at IS NULL
-               ORDER BY created_at DESC LIMIT ?""",
-            (user_id, limit)
-        )
-    else:
-        # Build LIKE clauses for each keyword
-        conditions = " OR ".join(["(content LIKE ? OR context LIKE ?)"] * len(words))
-        args = []
-        for w in words:
-            args.extend([f"%{w}%", f"%{w}%"])
-
-        cursor = await db.execute(
-            f"""SELECT id, type, content, confidence FROM memory
-                WHERE user_id = ? AND deleted_at IS NULL AND ({conditions})
-                ORDER BY confidence DESC LIMIT ?""",
-            [user_id] + args + [limit]
-        )
-
+    # Always fetch top 15 by confidence
+    cursor = await db.execute(
+        """SELECT id, type, content, confidence FROM memory
+           WHERE user_id = ? AND deleted_at IS NULL
+           ORDER BY confidence DESC LIMIT 15""",
+        (user_id,)
+    )
     rows = await cursor.fetchall()
-    return [
+    memories = [
         {"id": r["id"], "type": r["type"], "content": r["content"], "confidence": r["confidence"]}
         for r in rows
     ]
+
+    if not memories:
+        return []
+
+    # Try semantic reranking with Groq
+    try:
+        reranked = await _semantic_rerank(db, memories, query_text)
+    except Exception as e:
+        print(f"[memory_service] rerank failed, falling back to top 5 by confidence: {e}")
+        # Fall back to top 5 by confidence
+        returned = memories[:5]
+        await update_memory_usage(db, [m["id"] for m in returned])
+        return returned
+
+    # Return 5-7 reranked memories
+    returned = reranked[:7] if len(reranked) > 7 else reranked
+    # Ensure we return at least 5 if we have them
+    if len(returned) < 5 and len(memories) >= 5:
+        returned = memories[:5]
+
+    await update_memory_usage(db, [m["id"] for m in returned])
+    return returned
 
 
 def format_memories_for_context(memories: list[dict]) -> str:
