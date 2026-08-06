@@ -9,6 +9,7 @@ import Grainient from '../components/ui/Grainient'
 import SettingsPanel from '../components/settings/SettingsPanel'
 import SessionMenuPanel from '../components/settings/SessionMenuPanel'
 import AboutLuna from '../components/ui/AboutLuna'
+import SummaryModal from '../components/ui/SummaryModal'
 import { API_BASE } from '../config'
 import useSessionStore from '../store/sessionStore'
 import useChatStore from '../store/chatStore'
@@ -733,6 +734,16 @@ const SessionsPage = () => {
         summaryState={summaryState}
         onCloseSummary={handleCloseSummary}
       />
+
+      {/* Summary modal — shown for both 'generating' (with spinner) and 'done' (with content) */}
+      {(summaryState.status === 'generating' || summaryState.status === 'done') && (
+        <SummaryModal
+          isOpen={true}
+          summary={summaryState.summary}
+          onClose={handleCloseSummary}
+          isGenerating={summaryState.status === 'generating'}
+        />
+      )}
 
       {/* UI layer — above the gradient */}
       <div className="relative z-10 flex h-full w-full">

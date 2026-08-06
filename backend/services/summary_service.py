@@ -16,6 +16,29 @@ Format: "[emotional tone] - [main topic] - [user's goal or progress]"
 Example: "Reflective - anxiety and work stress - user identified coping strategies"
 """
 
+DETAILED_SUMMARY_PROMPT = """You are a reflective journaling assistant. Given a therapy conversation between a user and LUNA, generate a comprehensive summary for the user to read.
+
+Write in natural, readable prose (not JSON, not bullet points). Aim for 300–500 words. Structure the summary with these sections, clearly labeled:
+
+**Conversation Overview** — A brief overview of what this conversation was about.
+
+**Main Topics Discussed** — The key subjects and themes that came up.
+
+**Emotional Themes** — The emotional undercurrents observed (e.g., anxiety, hope, frustration, relief).
+
+**Insights Identified** — Any meaningful realizations, shifts in perspective, or useful reframes that emerged.
+
+**Positive Progress** — Any evidence of growth, coping strategies used, or steps already taken.
+
+**Suggested Reflection** — A gentle, open-ended question or prompt to help the user continue processing on their own.
+
+Write with warmth and without clinical language. This is for the user, not for LUNA.
+
+Conversation:
+{conversation}
+
+Detailed Summary:"""
+
 
 async def get_summary(db: aiosqlite.Connection, session_id: str) -> str | None:
     """Return the existing summary for a session, if any."""
@@ -81,6 +104,37 @@ async def generate_summary_text(messages: list[dict]) -> str:
         return summary
     except Exception as e:
         print(f"[summary_service] Groq summarization failed: {e}")
+        return ""
+
+
+async def generate_detailed_summary_text(messages: list[dict]) -> str:
+    """
+    Generate a detailed, user-facing summary (300-500 words) for the modal.
+    messages: list of {role, content} dicts (most recent last).
+    """
+    lines = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = (msg.get("content") or "").strip()
+        if content:
+            lines.append(f"{role}: {content}")
+    conversation_text = "\n".join(lines)
+
+    prompt = DETAILED_SUMMARY_PROMPT.format(conversation=conversation_text)
+
+    try:
+        client = groq_service.get_client()
+        model = groq_service.get_model()
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+            max_tokens=700,
+        )
+        summary = (response.choices[0].message.content or "").strip()
+        return summary
+    except Exception as e:
+        print(f"[summary_service] detailed summary failed: {e}")
         return ""
 
 

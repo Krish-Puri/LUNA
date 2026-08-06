@@ -169,8 +169,8 @@ async def generate_session_summary(
     if not msg_dicts:
         raise HTTPException(status_code=400, detail="No messages to summarize")
 
-    # Generate summary via Groq
-    summary_text = await summary_service.generate_summary_text(msg_dicts)
+    # Generate detailed user-facing summary via Groq
+    summary_text = await summary_service.generate_detailed_summary_text(msg_dicts)
     if not summary_text:
         raise HTTPException(status_code=500, detail="Summary generation failed")
 
